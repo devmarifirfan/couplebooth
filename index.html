@@ -1,55 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Photobooth Berdua</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-</head>
-<body class="bg-gray-100 text-center p-6">
-  <h1 class="text-3xl font-bold mb-4">📸 Photobooth Berdua</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Photobooth Berdua</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  </head>
+  <body class="bg-gray-100 text-center p-6">
+    <h1 class="text-3xl font-bold mb-4">📸 Photobooth Berdua</h1>
 
-  <div class="space-y-3">
-    <input type="text" id="roomInput" placeholder="Kode Room" class="px-4 py-2 border rounded"/>
-    <button onclick="generateRoom()" class="bg-purple-600 text-white px-4 py-2 rounded">🎲 Buat Room</button>
-    <button onclick="joinRoom()" class="bg-green-600 text-white px-4 py-2 rounded">📥 Join Room</button>
-  </div>
+    <div class="space-y-3">
+      <input
+        type="text"
+        id="roomInput"
+        placeholder="Kode Room"
+        class="px-4 py-2 border rounded"
+      />
+      <button
+        onclick="generateRoom()"
+        class="bg-purple-600 text-white px-4 py-2 rounded"
+      >
+        🎲 Buat Room
+      </button>
+      <button
+        onclick="joinRoom()"
+        class="bg-green-600 text-white px-4 py-2 rounded"
+      >
+        📥 Join Room
+      </button>
+    </div>
 
-  <div id="stripSelector" class="mt-4 hidden">
-    <label for="stripCount" class="font-semibold">Jumlah Strip:</label>
-    <select id="stripCount" class="ml-2 px-2 py-1 border rounded">
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="6">6</option>
-    </select>
-  </div>
+    <div id="stripSelector" class="mt-4 hidden">
+      <label for="stripCount" class="font-semibold">Jumlah Strip:</label>
+      <select id="stripCount" class="ml-2 px-2 py-1 border rounded">
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="6">6</option>
+      </select>
+    </div>
 
-  <div id="booth" class="mt-8 hidden space-y-4">
-    <div class="flex justify-center gap-4">
-      <div>
-        <p class="font-medium">Kamera Kamu</p>
-        <video id="localVideo" autoplay playsinline class="w-64 h-48 rounded shadow border"></video>
+    <div id="booth" class="mt-8 hidden space-y-4">
+      <div class="flex justify-center gap-4">
+        <div>
+          <p class="font-medium">Kamera Kamu</p>
+          <video
+            id="localVideo"
+            autoplay
+            playsinline
+            class="w-64 h-48 rounded shadow border"
+          ></video>
+        </div>
+        <div>
+          <p class="font-medium">Pasanganmu</p>
+          <video
+            id="remoteVideo"
+            autoplay
+            playsinline
+            class="w-64 h-48 rounded shadow border"
+          ></video>
+        </div>
       </div>
-      <div>
-        <p class="font-medium">Pasanganmu</p>
-        <video id="remoteVideo" autoplay playsinline class="w-64 h-48 rounded shadow border"></video>
+      <button
+        onclick="flipCamera()"
+        class="bg-yellow-600 text-white px-4 py-2 rounded"
+      >
+        🔄 Flip Kamera
+      </button>
+
+      <p id="statusText" class="text-sm text-gray-600">
+        Status: Belum Terhubung
+      </p>
+      <button id="captureBtn" class="bg-blue-600 text-white px-6 py-2 rounded">
+        📸 Capture
+      </button>
+
+      <div id="previewArea" class="mt-6">
+        <h2 class="text-lg font-semibold mb-2">Hasil Strip</h2>
+        <div
+          id="photoGallery"
+          class="flex flex-wrap justify-center gap-3"
+        ></div>
+        <a
+          id="downloadStripLink"
+          class="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded hidden"
+          download="strip.png"
+          >📥 Download Strip</a
+        >
       </div>
     </div>
 
-    <p id="statusText" class="text-sm text-gray-600">Status: Belum Terhubung</p>
-    <button id="captureBtn" class="bg-blue-600 text-white px-6 py-2 rounded">📸 Capture</button>
+    <canvas id="canvas" class="hidden"></canvas>
 
-    <div id="previewArea" class="mt-6">
-      <h2 class="text-lg font-semibold mb-2">Hasil Strip</h2>
-      <div id="photoGallery" class="flex flex-wrap justify-center gap-3"></div>
-      <a id="downloadStripLink" class="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded hidden" download="strip.png">📥 Download Strip</a>
-    </div>
-  </div>
-
-  <canvas id="canvas" class="hidden"></canvas>
-
-  <script type="module" src="./script.js"></script>
-</body>
+    <script type="module" src="./script.js"></script>
+  </body>
 </html>
