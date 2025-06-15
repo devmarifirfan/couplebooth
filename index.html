@@ -58,7 +58,9 @@
 
     <!-- Strip Selector -->
     <div id="stripSelector" class="mt-4 hidden">
-      <label for="stripCount" class="font-semibold text-pink-600">Jumlah Strip:</label>
+      <label for="stripCount" class="font-semibold text-pink-600"
+        >Jumlah Strip:</label
+      >
       <select
         id="stripCount"
         class="ml-2 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-pink-300"
@@ -96,11 +98,12 @@
       <!-- Flip and Status -->
       <div class="space-y-2">
         <button
-          onclick="flipCamera()"
-          class="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded shadow transition-transform duration-300 hover:scale-105"
+          id="resetRoomBtn"
+          class="mt-4 bg-red-500 text-white px-4 py-2 rounded"
         >
-          🔄 Flip Kamera
+          Reset Room
         </button>
+
         <p id="statusText" class="text-sm text-gray-600 italic">
           Status: Belum Terhubung
         </p>
@@ -117,7 +120,10 @@
       <!-- Preview Area -->
       <div id="previewArea" class="mt-6">
         <h2 class="text-lg font-semibold mb-2 text-pink-600">Hasil Strip</h2>
-        <div id="photoGallery" class="flex flex-wrap justify-center gap-3"></div>
+        <div
+          id="photoGallery"
+          class="flex flex-wrap justify-center gap-3"
+        ></div>
         <a
           id="downloadStripLink"
           class="mt-4 inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded shadow hidden transition-transform duration-300 hover:scale-105"
