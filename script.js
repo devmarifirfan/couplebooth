@@ -223,38 +223,46 @@ captureBtn.onclick = () => {
     return;
   }
 
-  const squareSize = 480;
-  canvas.width = squareSize;
-  canvas.height = squareSize;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(localVideo, 0, 0, squareSize, squareSize);
-  myCapture = canvas.toDataURL("image/png");
+  let countdownElement = document.getElementById("countdown");
+  let count = 3;
+  countdownElement.textContent = count;
+  countdownElement.classList.remove("hidden");
 
-  const userKey = isMaster ? "master" : "client";
-  set(ref(db, `rooms/${roomCode}/capture/${userKey}`), myCapture);
-  showToast("Menunggu pasangan...");
+  const countdownInterval = setInterval(() => {
+    count--;
+    if (count === 0) {
+      clearInterval(countdownInterval);
+      countdownElement.classList.add("hidden");
 
-  const partnerKey = isMaster ? "client" : "master";
-  const partnerRef = ref(db, `rooms/${roomCode}/capture/${partnerKey}`);
+      const squareSize = 480;
+      canvas.width = squareSize;
+      canvas.height = squareSize;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(localVideo, 0, 0, squareSize, squareSize);
+      myCapture = canvas.toDataURL("image/png");
 
-  if (isListening) return;
-  isListening = true;
+      const userKey = isMaster ? "master" : "client";
+      set(ref(db, `rooms/${roomCode}/capture/${userKey}`), myCapture);
+      showToast("Menunggu pasangan...");
 
-  onValue(partnerRef, async (snap) => {
-    const partnerImg = snap.val();
-    if (partnerImg && !partnerCaptured) {
-      partnerCaptured = true;
-      setTimeout(() => {
-        combineImages(myCapture, partnerImg);
-        partnerCaptured = false;
-        remove(ref(db, `rooms/${roomCode}/capture`));
-
-        off(partnerRef); 
-        isListening = false; 
-      }, 500);
+      const partnerKey = isMaster ? "client" : "master";
+      onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), async (snap) => {
+        const partnerImg = snap.val();
+        if (partnerImg && !partnerCaptured) {
+          partnerCaptured = true;
+          setTimeout(() => {
+            combineImages(myCapture, partnerImg);
+            partnerCaptured = false;
+            remove(ref(db, `rooms/${roomCode}/capture`));
+          }, 500);
+        }
+      });
+    } else {
+      countdownElement.textContent = count;
     }
-  });
+  }, 1000);
 };
+
 
 function combineImages(img1, img2) {
   const left = new Image();
@@ -332,16 +340,17 @@ function updateDownload() {
 resetRoomBtn.onclick = () => {
   if (!roomCode) return alert("Belum masuk room.");
 
-  // Hapus semua data di Firebase untuk room tersebut
-  remove(ref(db, `rooms/${roomCode}`));
+  // Hapus hanya bagian foto/capture di database
+  remove(ref(db, `rooms/${roomCode}/capture`));
 
-  // Reset galeri foto
+  // Reset state di sisi UI
   capturedImages = [];
+  partnerCaptured = false;
   photoGallery.innerHTML = "";
   downloadStripLink.classList.add("hidden");
   renderEmptyStrips();
 
-  showToast("Room berhasil di-reset. Siap foto ulang!");
+  showToast("Foto berhasil di-reset. Siap mulai sesi baru!");
 };
 
 function showToast(msg) {
