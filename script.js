@@ -10,12 +10,26 @@ const countdown = document.getElementById("countdown");
 const photoGallery = document.getElementById("photoGallery");
 const canvas = document.getElementById("canvas");
 const downloadStripLink = document.getElementById("downloadStripLink");
+const stripCountSelect = document.getElementById("stripCount");
 
 let roomCode = "";
 let stream = null;
 let userPath = "user1";
 let partnerPath = "user2";
 let capturedImages = [];
+let mode = "self";
+let currentStrip = 0;
+let maxStrip = 3;
+
+document.querySelectorAll("input[name='mode']").forEach(input => {
+  input.addEventListener("change", () => {
+    mode = document.querySelector("input[name='mode']:checked").value;
+  });
+});
+
+stripCountSelect.addEventListener("change", () => {
+  maxStrip = parseInt(stripCountSelect.value);
+});
 
 window.generateRoomCode = function () {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -36,16 +50,9 @@ window.joinRoom = async function () {
   }
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 320 },
-        height: { ideal: 240 },
-        aspectRatio: 4 / 3,
-      },
-    });
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
     localVideo.srcObject = stream;
 
-    // Kirim frame secara berkala
     setTimeout(() => {
       setInterval(() => {
         const tempCanvas = document.createElement("canvas");
@@ -63,8 +70,6 @@ window.joinRoom = async function () {
   }
 
   const partnerRef = ref(db, `rooms/${roomCode}/${partnerPath}`);
-
-  // Snapshot awal
   get(partnerRef).then((snapshot) => {
     const dataUrl = snapshot.val();
     if (dataUrl) {
@@ -73,7 +78,6 @@ window.joinRoom = async function () {
     }
   });
 
-  // Realtime update
   onValue(partnerRef, (snapshot) => {
     const dataUrl = snapshot.val();
     if (dataUrl) {
@@ -99,67 +103,112 @@ function startCountdown(callback) {
   }, 1000);
 }
 
-captureBtn.onclick = () => {
-  startCountdown(() => {
-    const squareSize = 240; // 1:1 ratio per user
-    canvas.width = squareSize * 2;
-    canvas.height = squareSize;
-    const ctx = canvas.getContext("2d");
+function captureSelf() {
+  const squareSize = 240;
+  canvas.width = squareSize;
+  canvas.height = squareSize;
+  const ctx = canvas.getContext("2d");
 
-    // Crop center dari video jadi 1:1
-    const cropX = (localVideo.videoWidth - squareSize) / 2;
-    const cropY = (localVideo.videoHeight - squareSize) / 2;
+  const cropX = (localVideo.videoWidth - squareSize) / 2;
+  const cropY = (localVideo.videoHeight - squareSize) / 2;
+  ctx.drawImage(localVideo, cropX, cropY, squareSize, squareSize, 0, 0, squareSize, squareSize);
 
-    ctx.drawImage(
-      localVideo,
-      cropX,
-      cropY,
-      squareSize,
-      squareSize,
-      0,
-      0,
-      squareSize,
-      squareSize
-    );
-    ctx.drawImage(
-      remoteImg,
-      0,
-      0,
-      remoteImg.naturalWidth,
-      remoteImg.naturalHeight,
-      squareSize,
-      0,
-      squareSize,
-      squareSize
-    );
+  const imageURL = canvas.toDataURL("image/png");
+  addCapturedImage(imageURL);
+}
 
-    const imageURL = canvas.toDataURL("image/png");
-    capturedImages.push(imageURL);
+function captureTogether() {
+  const captureRef = ref(db, `rooms/${roomCode}/capture/${userPath}`);
+  const partnerCaptureRef = ref(db, `rooms/${roomCode}/capture/${partnerPath}`);
 
-    const img = document.createElement("img");
-    img.src = imageURL;
-    img.classList.add("strip-img");
-    photoGallery.appendChild(img);
-    updateStripDownload();
+  const squareSize = 240;
+  canvas.width = squareSize;
+  canvas.height = squareSize;
+  const ctx = canvas.getContext("2d");
+
+  const cropX = (localVideo.videoWidth - squareSize) / 2;
+  const cropY = (localVideo.videoHeight - squareSize) / 2;
+  ctx.drawImage(localVideo, cropX, cropY, squareSize, squareSize, 0, 0, squareSize, squareSize);
+  const dataURL = canvas.toDataURL("image/png");
+
+  set(captureRef, dataURL);
+
+  const unsubscribe = onValue(partnerCaptureRef, (snap) => {
+    const partnerImage = snap.val();
+    if (partnerImage) {
+      unsubscribe();
+
+      const finalCanvas = document.createElement("canvas");
+      finalCanvas.width = squareSize * 2;
+      finalCanvas.height = squareSize;
+      const finalCtx = finalCanvas.getContext("2d");
+
+      const img1 = new Image();
+      img1.src = userPath === "user1" ? dataURL : partnerImage;
+      const img2 = new Image();
+      img2.src = userPath === "user1" ? partnerImage : dataURL;
+
+      img1.onload = () => {
+        finalCtx.drawImage(img1, 0, 0, squareSize, squareSize);
+        img2.onload = () => {
+          finalCtx.drawImage(img2, squareSize, 0, squareSize, squareSize);
+          const finalImageURL = finalCanvas.toDataURL("image/png");
+          addCapturedImage(finalImageURL);
+        };
+      };
+    }
   });
-};
+}
+
+function addCapturedImage(imageURL) {
+  capturedImages.push(imageURL);
+  const img = document.createElement("img");
+  img.src = imageURL;
+  img.classList.add("strip-img");
+  photoGallery.appendChild(img);
+  currentStrip++;
+
+  updateStripDownload();
+
+  if (currentStrip >= maxStrip) {
+    alert("Sesi foto selesai!");
+    captureBtn.disabled = true;
+  }
+}
 
 function updateStripDownload() {
   if (capturedImages.length < 1) return;
-
-  const stripCanvas = document.createElement("canvas");
   const width = 640;
   const height = 240 * capturedImages.length;
+
+  const stripCanvas = document.createElement("canvas");
   stripCanvas.width = width;
   stripCanvas.height = height;
   const ctx = stripCanvas.getContext("2d");
 
-  capturedImages.forEach((src, index) => {
+  let loaded = 0;
+  capturedImages.forEach((src, i) => {
     const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, i * 240, width, 240);
+      loaded++;
+      if (loaded === capturedImages.length) {
+        const stripDataURL = stripCanvas.toDataURL("image/png");
+        downloadStripLink.href = stripDataURL;
+      }
+    };
     img.src = src;
-    ctx.drawImage(img, 0, index * 240, width, 240);
   });
-
-  const stripDataURL = stripCanvas.toDataURL("image/png");
-  downloadStripLink.href = stripDataURL;
 }
+
+captureBtn.onclick = () => {
+  if (currentStrip >= maxStrip) return;
+
+  startCountdown(() => {
+    if (mode === "self") {
+      captureSelf();
+    } else {
+      captureTogether();
+    }
+  });
+};

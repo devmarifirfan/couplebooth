@@ -7,7 +7,22 @@
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-  <h1>📸 Photobooth Berdua</h1>
+  <h1>📸 Photobooth</h1>
+
+  <div>
+    <label><input type="radio" name="mode" value="self" checked /> Sendiri</label>
+    <label><input type="radio" name="mode" value="couple" /> Berdua</label>
+  </div>
+
+  <div>
+    <label>Jumlah Strip: </label>
+    <select id="stripCount">
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="6">6</option>
+    </select>
+  </div>
+
   <input type="text" id="roomInput" placeholder="Kode Room"/>
   <button onclick="generateRoomCode()">🎲 Generate</button>
   <button onclick="joinRoom()">📥 Join Room</button>
@@ -20,7 +35,7 @@
     <div id="countdown" class="hidden">3</div>
 
     <br />
-    <button id="captureBtn">📷 Ambil Foto Berdua</button>
+    <button id="captureBtn">📷 Ambil Foto</button>
     <div id="photoGallery"></div>
     <a id="downloadStripLink" download="strip-berdua.png">📥 Download Strip</a>
   </div>
