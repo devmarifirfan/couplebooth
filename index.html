@@ -15,22 +15,17 @@
   <div id="booth" class="hidden">
     <video id="localVideo" autoplay muted playsinline></video>
     <img id="remoteImg" alt="Pasanganmu akan muncul di sini"/>
-    <p id="statusText">Status: Menunggu...</p>
+    <p id="statusText">Status: Menunggu pasangan...</p>
+
+    <div id="countdown" class="hidden">3</div>
+
     <br />
     <button id="captureBtn">📷 Ambil Foto Berdua</button>
-    <a id="downloadLink" download="hasil-berdua-strip.png">📥 Download Strip</a>
-    <br />
-    <canvas id="canvas" class="hidden"></canvas>
-
-    <!-- Galeri Foto -->
-    <div id="photoGallery" class="hidden">
-      <h2>🖼️ Galeri Foto</h2>
-      <div id="photoList" style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;"></div>
-      <br />
-      <button id="downloadStripBtn">📥 Download Semua dalam Strip</button>
-    </div>
+    <div id="photoGallery"></div>
+    <a id="downloadStripLink" download="strip-berdua.png">📥 Download Strip</a>
   </div>
 
+  <canvas id="canvas" class="hidden"></canvas>
   <script type="module" src="./script.js"></script>
 </body>
 </html>
