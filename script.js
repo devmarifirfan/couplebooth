@@ -19,7 +19,9 @@ const stripSelector = document.getElementById("stripSelector");
 const photoGallery = document.getElementById("photoGallery");
 const downloadStripLink = document.getElementById("downloadStripLink");
 const canvas = document.getElementById("canvas");
-const resetRoomBtn = document.getElementById("resetRoomBtn"); // tombol reset
+const resetRoomBtn = document.getElementById("resetRoomBtn");
+const frameCheckboxes = document.getElementById("frameCheckboxes");
+const downloadLinksContainer = document.getElementById("downloadLinksContainer");
 
 let roomCode = "";
 let isMaster = false;
@@ -34,6 +36,12 @@ let myCapture = null;
 const rtcConfig = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
+
+const frames = [
+  "/assets/frame1.png",
+  "/assets/frame2.png",
+  "/assets/frame3.png",
+];
 
 window.generateRoom = async () => {
   roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -65,10 +73,8 @@ async function setupCamera() {
       video: { facingMode: currentFacingMode, width: 480, height: 480 },
       audio: false,
     });
-    console.log("Akses kamera berhasil:", stream);
     localVideo.srcObject = stream;
   } catch (error) {
-    console.error("Gagal mengakses kamera:", error);
     showToast("Gagal mengakses kamera, periksa izin browser.");
   }
 }
@@ -86,10 +92,7 @@ window.flipCamera = async () => {
 };
 
 function setupConnection() {
-  if (!stream) {
-    console.error("Stream belum siap!");
-    return;
-  }
+  if (!stream) return;
 
   peerConnection = new RTCPeerConnection(rtcConfig);
 
@@ -98,10 +101,8 @@ function setupConnection() {
   });
 
   peerConnection.ontrack = (e) => {
-    console.log("Track diterima dari pasangan:", e.streams);
     if (e.streams && e.streams[0]) {
       remoteVideo.srcObject = e.streams[0];
-      console.log("Remote stream:", e.streams[0]);
     }
   };
 
@@ -109,20 +110,10 @@ function setupConnection() {
     if (e.candidate) {
       const candidateRef = ref(
         db,
-        `rooms/${roomCode}/${
-          isMaster ? "callerCandidates" : "calleeCandidates"
-        }`
+        `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`
       );
       push(candidateRef, e.candidate.toJSON());
     }
-  };
-
-  peerConnection.oniceconnectionstatechange = () => {
-    console.log("ICE connection state:", peerConnection.iceConnectionState);
-  };
-
-  peerConnection.onconnectionstatechange = () => {
-    console.log("Peer connection state:", peerConnection.connectionState);
   };
 
   if (isMaster) {
@@ -134,17 +125,13 @@ function setupConnection() {
 
 async function createOffer() {
   const offer = await peerConnection.createOffer();
-  console.log("Mengirim offer:", offer);
   await peerConnection.setLocalDescription(offer);
-  set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
+  set(ref(db, `rooms/${roomCode}/offer`), offer);
 
   onValue(ref(db, `rooms/${roomCode}/answer`), async (snapshot) => {
     const data = snapshot.val();
     if (data && !peerConnection.currentRemoteDescription) {
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(data)
-      );
-      console.log("Jawaban diterima:", data);
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
@@ -161,17 +148,10 @@ function listenForOffer() {
   onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
     const offer = snap.val();
     if (offer) {
-      console.log("Menerima offer:", offer);
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(offer)
-      );
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-      console.log("Mengirim jawaban:", answer);
-      set(ref(db, `rooms/${roomCode}/answer`), {
-        sdp: answer.sdp,
-        type: answer.type,
-      });
+      set(ref(db, `rooms/${roomCode}/answer`), answer);
 
       statusText.textContent = "Status: Terhubung!";
       showToast("Terhubung ke pasangan!");
@@ -264,13 +244,7 @@ function combineImages(img1, img2) {
         [img1, img2].forEach((src, i) => {
           const img = document.createElement("img");
           img.src = src;
-          img.classList.add(
-            "w-full",
-            "h-full",
-            "object-cover",
-            "rounded",
-            "border"
-          );
+          img.classList.add("w-full", "h-full", "object-cover", "rounded", "border");
           const cell = row.children[i];
           cell.innerHTML = "";
           cell.appendChild(img);
@@ -287,52 +261,92 @@ function combineImages(img1, img2) {
   right.src = isMaster ? img2 : img1;
 }
 
-function updateDownload() {
-  if (capturedImages.length < 1) return;
+async function updateDownload() {
+  const selectedFrames = Array.from(
+    frameCheckboxes.querySelectorAll("input:checked")
+  ).map((el) => el.value);
 
-  const stripCanvas = document.createElement("canvas");
-  stripCanvas.width = 960;
-  stripCanvas.height = 480 * capturedImages.length;
-  const ctx = stripCanvas.getContext("2d");
+  if (capturedImages.length < 1 || selectedFrames.length === 0) return;
 
-  let loadedCount = 0;
+  downloadLinksContainer.innerHTML = "";
+  downloadLinksContainer.classList.remove("hidden");
 
-  capturedImages.forEach(([leftSrc, rightSrc], index) => {
-    const leftImg = new Image();
-    const rightImg = new Image();
-    let pairLoaded = 0;
+  for (const frameKey of selectedFrames) {
+    const stripCanvas = document.createElement("canvas");
+    stripCanvas.width = 960;
+    stripCanvas.height = 480 * capturedImages.length;
+    const ctx = stripCanvas.getContext("2d");
 
-    leftImg.onload = rightImg.onload = () => {
-      pairLoaded++;
-      if (pairLoaded === 2) {
-        ctx.drawImage(leftImg, 0, index * 480, 480, 480);
-        ctx.drawImage(rightImg, 480, index * 480, 480, 480);
-        loadedCount++;
-        if (loadedCount === capturedImages.length) {
-          const dataURL = stripCanvas.toDataURL("image/png");
-          downloadStripLink.href = dataURL;
-          downloadStripLink.classList.remove("hidden");
+    for (let i = 0; i < capturedImages.length; i++) {
+      const pair = capturedImages[i];
+      const combined = await combineTwoImages(pair[0], pair[1], frameKey);
+      const img = new Image();
+      img.src = combined;
+      await new Promise((res) => {
+        img.onload = () => {
+          ctx.drawImage(img, 0, i * 480, 960, 480);
+          res();
+        };
+      });
+    }
+
+    const dataURL = stripCanvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = dataURL;
+    link.download = `strip-${frameKey === "none" ? "noframe" : "frame" + (+frameKey + 1)}.png`;
+    link.textContent = `Download (${frameKey === "none" ? "Tanpa Frame" : "Frame " + (+frameKey + 1)})`;
+    link.className = "px-4 py-2 bg-purple-600 text-white rounded inline-block";
+    downloadLinksContainer.appendChild(link);
+  }
+}
+
+function combineTwoImages(imgSrc1, imgSrc2, frameKey) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 960;
+    canvas.height = 480;
+    const ctx = canvas.getContext("2d");
+
+    const img1 = new Image();
+    const img2 = new Image();
+    const frameImg = new Image();
+
+    let loaded = 0;
+    const total = frameKey === "none" ? 2 : 3;
+    const checkLoaded = () => {
+      loaded++;
+      if (loaded === total) {
+        ctx.drawImage(img1, 0, 0, 480, 480);
+        ctx.drawImage(img2, 480, 0, 480, 480);
+        if (frameKey !== "none") {
+          ctx.drawImage(frameImg, 0, 0, 480, 480);
+          ctx.drawImage(frameImg, 480, 0, 480, 480);
         }
+        resolve(canvas.toDataURL("image/png"));
       }
     };
 
-    leftImg.src = leftSrc;
-    rightImg.src = rightSrc;
+    img1.onload = checkLoaded;
+    img2.onload = checkLoaded;
+    if (frameKey !== "none") {
+      frameImg.src = frames[parseInt(frameKey)];
+      frameImg.onload = checkLoaded;
+    }
+
+    img1.src = imgSrc1;
+    img2.src = imgSrc2;
+    if (frameKey === "none") checkLoaded();
   });
 }
 
 resetRoomBtn.onclick = () => {
   if (!roomCode) return alert("Belum masuk room.");
-
-  // Hapus semua data di Firebase untuk room tersebut
   remove(ref(db, `rooms/${roomCode}`));
-
-  // Reset galeri foto
   capturedImages = [];
   photoGallery.innerHTML = "";
   downloadStripLink.classList.add("hidden");
+  downloadLinksContainer.classList.add("hidden");
   renderEmptyStrips();
-
   showToast("Room berhasil di-reset. Siap foto ulang!");
 };
 
