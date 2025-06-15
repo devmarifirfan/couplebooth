@@ -33,21 +33,13 @@ let myCapture = null;
 
 const rtcConfig = {
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
     {
-      urls: "turn:abcd1234.relay.metered.ca:80",
-      username: "abcd1234",
-      credential: "xyz7890",
+      urls: "stun:stun.l.google.com:19302",
     },
     {
-      urls: "turn:abcd1234.relay.metered.ca:443",
-      username: "abcd1234",
-      credential: "xyz7890",
-    },
-    {
-      urls: "turn:abcd1234.relay.metered.ca:443?transport=tcp",
-      username: "abcd1234",
-      credential: "xyz7890",
+      urls: "turn:global.relay.metered.ca:443",
+      username: "1f0271e7b05467e2a0f50b5d",
+      credential: "XyXC1HRj5a2FcjFc",
     },
   ],
 };
