@@ -1,4 +1,3 @@
-// Import Firebase function dari konfigurasi file terpisah
 import {
   db,
   ref,
@@ -9,7 +8,6 @@ import {
   onChildAdded,
 } from "./firebase-config.js";
 
-// DOM Elements
 const roomInput = document.getElementById("roomInput");
 const booth = document.getElementById("booth");
 const localVideo = document.getElementById("localVideo");
@@ -23,7 +21,6 @@ const downloadStripLink = document.getElementById("downloadStripLink");
 const canvas = document.getElementById("canvas");
 const resetRoomBtn = document.getElementById("resetRoomBtn"); // tombol reset
 
-// Variabel Global
 let roomCode = "";
 let isMaster = false;
 let stream;
@@ -38,7 +35,6 @@ const rtcConfig = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
-// Fungsi: Generate Room Baru
 window.generateRoom = async () => {
   roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
   roomInput.value = roomCode;
@@ -47,7 +43,6 @@ window.generateRoom = async () => {
   stripSelector.classList.remove("hidden");
 };
 
-// Fungsi: Join Room
 window.joinRoom = async () => {
   roomCode = roomInput.value.trim();
   if (!roomCode) return alert("Masukkan Room Code!");
@@ -56,6 +51,7 @@ window.joinRoom = async () => {
   capturedImages = [];
   photoGallery.innerHTML = "";
   downloadStripLink.classList.add("hidden");
+
   booth.classList.remove("hidden");
 
   await setupCamera();
@@ -63,7 +59,6 @@ window.joinRoom = async () => {
   renderEmptyStrips();
 };
 
-// Fungsi: Setup Kamera
 async function setupCamera() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -78,7 +73,6 @@ async function setupCamera() {
   }
 }
 
-// Fungsi: Flip Camera
 window.flipCamera = async () => {
   currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
   if (stream) stream.getTracks().forEach((track) => track.stop());
@@ -91,7 +85,6 @@ window.flipCamera = async () => {
   }
 };
 
-// Setup WebRTC Connection
 function setupConnection() {
   if (!stream) {
     console.error("Stream belum siap!");
@@ -105,6 +98,7 @@ function setupConnection() {
   });
 
   peerConnection.ontrack = (e) => {
+    console.log("Track diterima dari pasangan:", e.streams);
     if (e.streams && e.streams[0]) {
       remoteVideo.srcObject = e.streams[0];
       console.log("Remote stream:", e.streams[0]);
@@ -138,9 +132,9 @@ function setupConnection() {
   }
 }
 
-// Master: Kirim Offer
 async function createOffer() {
   const offer = await peerConnection.createOffer();
+  console.log("Mengirim offer:", offer);
   await peerConnection.setLocalDescription(offer);
   set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
 
@@ -150,6 +144,7 @@ async function createOffer() {
       await peerConnection.setRemoteDescription(
         new RTCSessionDescription(data)
       );
+      console.log("Jawaban diterima:", data);
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
@@ -162,16 +157,17 @@ async function createOffer() {
   });
 }
 
-// Client: Terima Offer dan Kirim Answer
 function listenForOffer() {
   onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
     const offer = snap.val();
     if (offer) {
+      console.log("Menerima offer:", offer);
       await peerConnection.setRemoteDescription(
         new RTCSessionDescription(offer)
       );
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
+      console.log("Mengirim jawaban:", answer);
       set(ref(db, `rooms/${roomCode}/answer`), {
         sdp: answer.sdp,
         type: answer.type,
@@ -189,7 +185,6 @@ function listenForOffer() {
   });
 }
 
-// Render Strip Kosong
 function renderEmptyStrips() {
   photoGallery.innerHTML = "";
   for (let i = 0; i < totalStrips; i++) {
@@ -222,7 +217,6 @@ function renderEmptyStrips() {
   }
 }
 
-// Fungsi Capture Tombol
 captureBtn.onclick = () => {
   if (capturedImages.length >= totalStrips) {
     showToast("Strip sudah penuh!");
@@ -241,7 +235,12 @@ captureBtn.onclick = () => {
   showToast("Menunggu pasangan...");
 
   const partnerKey = isMaster ? "client" : "master";
-  onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), async (snap) => {
+  const partnerRef = ref(db, `rooms/${roomCode}/capture/${partnerKey}`);
+
+  if (isListening) return;
+  isListening = true;
+
+  onValue(partnerRef, async (snap) => {
     const partnerImg = snap.val();
     if (partnerImg && !partnerCaptured) {
       partnerCaptured = true;
@@ -249,12 +248,14 @@ captureBtn.onclick = () => {
         combineImages(myCapture, partnerImg);
         partnerCaptured = false;
         remove(ref(db, `rooms/${roomCode}/capture`));
+
+        off(partnerRef); 
+        isListening = false; 
       }, 500);
     }
   });
 };
 
-// Gabungkan Gambar
 function combineImages(img1, img2) {
   const left = new Image();
   const right = new Image();
@@ -294,7 +295,6 @@ function combineImages(img1, img2) {
   right.src = isMaster ? img2 : img1;
 }
 
-// Buat Strip Gambar Final untuk Didownload
 function updateDownload() {
   if (capturedImages.length < 1) return;
 
@@ -329,12 +329,13 @@ function updateDownload() {
   });
 }
 
-// Fungsi Reset Room
 resetRoomBtn.onclick = () => {
   if (!roomCode) return alert("Belum masuk room.");
 
+  // Hapus semua data di Firebase untuk room tersebut
   remove(ref(db, `rooms/${roomCode}`));
 
+  // Reset galeri foto
   capturedImages = [];
   photoGallery.innerHTML = "";
   downloadStripLink.classList.add("hidden");
@@ -343,7 +344,6 @@ resetRoomBtn.onclick = () => {
   showToast("Room berhasil di-reset. Siap foto ulang!");
 };
 
-// Fungsi Tampilkan Notifikasi
 function showToast(msg) {
   Toastify({
     text: msg,
