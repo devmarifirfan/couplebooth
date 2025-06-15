@@ -185,23 +185,32 @@ function listenForOffer() {
 function renderEmptyStrips() {
   photoGallery.innerHTML = "";
   for (let i = 0; i < totalStrips; i++) {
-    const placeholder = document.createElement("div");
-    placeholder.classList.add(
-      "w-full",
-      "h-[120px]",
-      "rounded",
-      "border-2",
-      "border-dashed",
-      "border-purple-300",
-      "flex",
-      "items-center",
-      "justify-center",
-      "text-sm",
-      "text-purple-400",
-      "mb-2"
-    );
-    placeholder.textContent = `Strip ${i + 1}`;
-    photoGallery.appendChild(placeholder);
+    const row = document.createElement("div");
+    row.classList.add("flex", "gap-2", "mb-2");
+
+    const img1 = document.createElement("div");
+    const img2 = document.createElement("div");
+
+    [img1, img2].forEach((el) => {
+      el.classList.add(
+        "w-40",
+        "h-40",
+        "bg-purple-100",
+        "border",
+        "border-dashed",
+        "flex",
+        "items-center",
+        "justify-center",
+        "text-purple-300",
+        "text-sm",
+        "rounded"
+      );
+      el.textContent = "Foto";
+    });
+
+    row.appendChild(img1);
+    row.appendChild(img2);
+    photoGallery.appendChild(row);
   }
 }
 
@@ -231,9 +240,6 @@ captureBtn.onclick = () => {
         combineImages(myCapture, partnerImg);
         partnerCaptured = false;
         remove(ref(db, `rooms/${roomCode}/capture`));
-        if (capturedImages.length + 1 === totalStrips) {
-          setTimeout(updateDownload, 1000);
-        }
       }, 500);
     }
   });
@@ -257,22 +263,30 @@ function combineImages(img1, img2) {
       const finalImg = canvas.toDataURL("image/png");
       capturedImages.push(finalImg);
 
-      const img = document.createElement("img");
-      img.src = finalImg;
-      img.classList.add("w-40","max-h-60","object-cover", "border", "rounded", "shadow");
+      const imgRow = document.createElement("div");
+      imgRow.classList.add("flex", "gap-2", "mb-2");
 
-      const placeholders = photoGallery.querySelectorAll("div");
-      const index = capturedImages.length - 1;
-      if (placeholders[index]) {
-        photoGallery.replaceChild(img, placeholders[index]);
-      } else {
-        photoGallery.appendChild(img);
+      const imgEl1 = document.createElement("img");
+      imgEl1.src = isMaster ? img1 : img2;
+      imgEl1.classList.add("w-40", "h-40", "object-cover", "border", "rounded");
+
+      const imgEl2 = document.createElement("img");
+      imgEl2.src = isMaster ? img2 : img1;
+      imgEl2.classList.add("w-40", "h-40", "object-cover", "border", "rounded");
+
+      imgRow.appendChild(imgEl1);
+      imgRow.appendChild(imgEl2);
+
+      photoGallery.appendChild(imgRow);
+
+      if (capturedImages.length === totalStrips) {
+        setTimeout(updateDownload, 1000);
       }
     }
   };
 
-  left.src = isMaster ? img1 : img2;
-  right.src = isMaster ? img2 : img1;
+  left.src = img1;
+  right.src = img2;
 }
 
 function updateDownload() {
