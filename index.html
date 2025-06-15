@@ -10,27 +10,10 @@
       href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
     />
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-    <style>
-      @keyframes float {
-        0% {
-          transform: translateY(0);
-        }
-        50% {
-          transform: translateY(-8px);
-        }
-        100% {
-          transform: translateY(0);
-        }
-      }
-
-      .float-heart {
-        animation: float 3s ease-in-out infinite;
-      }
-    </style>
   </head>
-  <body class="bg-pink-50 text-center p-6 font-sans">
-    <h1 class="text-3xl sm:text-4xl font-bold mb-6 text-pink-600 float-heart">
-      💜 Photobooth buat pacalku yg lagi pgn bgttt tapi kita LDR 💜
+  <body class="bg-gray-100 text-center p-6 font-sans">
+    <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-purple-700">
+      Photobooth buat pacalku yg lagi pgn bgttt tapi kita LDR 💜
     </h1>
 
     <!-- Room Setup -->
@@ -39,18 +22,18 @@
         type="text"
         id="roomInput"
         placeholder="Kode Room"
-        class="px-4 py-2 border border-pink-300 rounded w-64 text-center focus:ring-2 focus:ring-pink-400"
+        class="px-4 py-2 border rounded w-64 text-center"
       />
       <div class="space-x-2">
         <button
           onclick="generateRoom()"
-          class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded shadow transition-transform duration-300 hover:scale-105"
+          class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
         >
           🎲 Buat Room
         </button>
         <button
           onclick="joinRoom()"
-          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow transition-transform duration-300 hover:scale-105"
+          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
         >
           📥 Join Room
         </button>
@@ -59,10 +42,10 @@
 
     <!-- Strip Selector -->
     <div id="stripSelector" class="mt-4 hidden">
-      <label for="stripCount" class="font-semibold text-pink-600">Jumlah Strip:</label>
+      <label for="stripCount" class="font-semibold">Jumlah Strip:</label>
       <select
         id="stripCount"
-        class="ml-2 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-pink-300"
+        class="ml-2 px-2 py-1 border rounded focus:outline-none"
       >
         <option value="3">3</option>
         <option value="4">4</option>
@@ -74,22 +57,22 @@
     <div id="booth" class="mt-10 hidden space-y-6">
       <div class="flex flex-wrap justify-center gap-6">
         <div>
-          <p class="font-medium mb-1 text-purple-700">Kamera Kamu</p>
+          <p class="font-medium mb-1">Kamera Kamu</p>
           <video
             id="localVideo"
             autoplay
             playsinline
             muted
-            class="w-64 h-64 object-cover rounded-2xl shadow-xl border-4 border-pink-200"
+            class="w-64 h-64 object-cover rounded shadow border"
           ></video>
         </div>
         <div>
-          <p class="font-medium mb-1 text-purple-700">Pasanganmu</p>
+          <p class="font-medium mb-1">Pasanganmu</p>
           <video
             id="remoteVideo"
             autoplay
             playsinline
-            class="w-64 h-64 object-cover rounded-2xl shadow-xl border-4 border-purple-200"
+            class="w-64 h-64 object-cover rounded shadow border"
           ></video>
         </div>
       </div>
@@ -98,11 +81,11 @@
       <div class="space-y-2">
         <button
           onclick="flipCamera()"
-          class="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded shadow transition-transform duration-300 hover:scale-105"
+          class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
         >
           🔄 Flip Kamera
         </button>
-        <p id="statusText" class="text-sm text-gray-600 italic">
+        <p id="statusText" class="text-sm text-gray-600">
           Status: Belum Terhubung
         </p>
       </div>
@@ -110,21 +93,21 @@
       <!-- Capture Button -->
       <button
         id="captureBtn"
-        class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded shadow-xl transition-transform duration-300 hover:scale-110"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow"
       >
         📸 Capture
       </button>
 
       <!-- Preview Area -->
       <div id="previewArea" class="mt-6">
-        <h2 class="text-lg font-semibold mb-2 text-pink-600">Hasil Strip</h2>
+        <h2 class="text-lg font-semibold mb-2">Hasil Strip</h2>
         <div
           id="photoGallery"
           class="flex flex-wrap justify-center gap-3"
         ></div>
         <a
           id="downloadStripLink"
-          class="mt-4 inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded shadow hidden transition-transform duration-300 hover:scale-105"
+          class="mt-4 inline-block bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded hidden"
           download="strip.png"
         >
           📥 Download Strip
