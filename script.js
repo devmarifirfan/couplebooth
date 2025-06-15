@@ -246,11 +246,6 @@ captureBtn.onclick = () => {
 };
 
 function combineImages(img1, img2) {
-  const size = 480;
-  canvas.width = size * 2;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-
   const left = new Image();
   const right = new Image();
   let loaded = 0;
@@ -258,36 +253,39 @@ function combineImages(img1, img2) {
   left.onload = right.onload = () => {
     loaded++;
     if (loaded === 2) {
-      ctx.drawImage(left, 0, 0, size, size);
-      ctx.drawImage(right, size, 0, size, size);
-      const finalImg = canvas.toDataURL("image/png");
-      capturedImages.push(finalImg);
+      const rowIndex = capturedImages.length;
+      capturedImages.push([img1, img2]);
 
-      const imgRow = document.createElement("div");
-      imgRow.classList.add("flex", "gap-2", "mb-2");
+      const row = photoGallery.children[rowIndex];
+      if (row && row.children.length === 2) {
+        [img1, img2].forEach((src, i) => {
+          const img = document.createElement("img");
+          img.src = src;
+          img.classList.add(
+            "w-full",
+            "h-full",
+            "object-cover",
+            "rounded",
+            "border"
+          );
 
-      const imgEl1 = document.createElement("img");
-      imgEl1.src = isMaster ? img1 : img2;
-      imgEl1.classList.add("w-40", "h-40", "object-cover", "border", "rounded");
-
-      const imgEl2 = document.createElement("img");
-      imgEl2.src = isMaster ? img2 : img1;
-      imgEl2.classList.add("w-40", "h-40", "object-cover", "border", "rounded");
-
-      imgRow.appendChild(imgEl1);
-      imgRow.appendChild(imgEl2);
-
-      photoGallery.appendChild(imgRow);
+          // Replace content inside each column div (left & right)
+          const cell = row.children[i];
+          cell.innerHTML = ""; // clear placeholder text
+          cell.appendChild(img);
+        });
+      }
 
       if (capturedImages.length === totalStrips) {
-        setTimeout(updateDownload, 1000);
+        setTimeout(updateDownload, 500);
       }
     }
   };
 
-  left.src = img1;
-  right.src = img2;
+  left.src = isMaster ? img1 : img2;
+  right.src = isMaster ? img2 : img1;
 }
+
 
 function updateDownload() {
   if (capturedImages.length < 1) return;
