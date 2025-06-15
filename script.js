@@ -50,11 +50,16 @@ window.joinRoom = async () => {
 };
 
 async function setupCamera() {
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: currentFacingMode, width: 480, height: 480 },
-    audio: false,
-  });
-  localVideo.srcObject = stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: currentFacingMode, width: 480, height: 480 },
+      audio: false,
+    });
+    localVideo.srcObject = stream;
+  } catch (error) {
+    console.error("Gagal mengakses kamera:", error);
+    showToast("Gagal mengakses kamera, periksa izin browser.");
+  }
 }
 
 window.flipCamera = async () => {
@@ -68,12 +73,20 @@ window.flipCamera = async () => {
 };
 
 function setupConnection() {
+  if (!stream) {
+    console.error("Stream belum siap!");
+    return;
+  }
+
   peerConnection = new RTCPeerConnection(rtcConfig);
   stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
 
   peerConnection.ontrack = (e) => {
-    if (!remoteVideo.srcObject) {
+    console.log("Track diterima dari pasangan:", e.streams);
+    if (e.streams && e.streams[0]) {
       remoteVideo.srcObject = e.streams[0];
+    } else {
+      console.warn("Tidak ada remote stream ditemukan!");
     }
   };
 
@@ -94,6 +107,7 @@ function setupConnection() {
 async function createOffer() {
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
+  console.log("Mengirim offer:", offer);
   set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
 
   onValue(ref(db, `rooms/${roomCode}/answer`), async (snapshot) => {
@@ -101,6 +115,7 @@ async function createOffer() {
     if (data && !peerConnection.currentRemoteDescription) {
       const answerDesc = new RTCSessionDescription(data);
       await peerConnection.setRemoteDescription(answerDesc);
+      console.log("Jawaban diterima:", answerDesc);
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
@@ -116,9 +131,11 @@ function listenForOffer() {
   onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
     const offer = snap.val();
     if (offer) {
+      console.log("Menerima offer:", offer);
       await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
+      console.log("Mengirim jawaban:", answer);
       set(ref(db, `rooms/${roomCode}/answer`), { sdp: answer.sdp, type: answer.type });
 
       statusText.textContent = "Status: Terhubung!";
