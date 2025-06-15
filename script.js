@@ -63,6 +63,7 @@ async function setupCamera() {
       video: { facingMode: currentFacingMode, width: 480, height: 480 },
       audio: false,
     });
+    console.log("Akses kamera berhasil:", stream);
     localVideo.srcObject = stream;
   } catch (error) {
     console.error("Gagal mengakses kamera:", error);
@@ -89,11 +90,16 @@ function setupConnection() {
   }
 
   peerConnection = new RTCPeerConnection(rtcConfig);
-  stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+
+  stream.getTracks().forEach((track) => {
+    peerConnection.addTrack(track, stream);
+  });
 
   peerConnection.ontrack = (e) => {
+    console.log("Track diterima dari pasangan:", e.streams);
     if (e.streams && e.streams[0]) {
       remoteVideo.srcObject = e.streams[0];
+      console.log("Remote stream:", e.streams[0]);
     }
   };
 
@@ -101,16 +107,18 @@ function setupConnection() {
     if (e.candidate) {
       const candidateRef = ref(
         db,
-        `rooms/${roomCode}/${
-          isMaster ? "callerCandidates" : "calleeCandidates"
-        }`
+        `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`
       );
-      push(candidateRef, e.candidate.toJSON()); // ✅ pakai push
+      push(candidateRef, e.candidate.toJSON());
     }
   };
 
   peerConnection.oniceconnectionstatechange = () => {
-    console.log("ICE Connection State:", peerConnection.iceConnectionState);
+    console.log("ICE connection state:", peerConnection.iceConnectionState);
+  };
+
+  peerConnection.onconnectionstatechange = () => {
+    console.log("Peer connection state:", peerConnection.connectionState);
   };
 
   if (isMaster) {
@@ -122,6 +130,7 @@ function setupConnection() {
 
 async function createOffer() {
   const offer = await peerConnection.createOffer();
+  console.log("Mengirim offer:", offer);
   await peerConnection.setLocalDescription(offer);
   set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
 
@@ -131,6 +140,7 @@ async function createOffer() {
       await peerConnection.setRemoteDescription(
         new RTCSessionDescription(data)
       );
+      console.log("Jawaban diterima:", data);
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
@@ -147,11 +157,13 @@ function listenForOffer() {
   onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
     const offer = snap.val();
     if (offer) {
+      console.log("Menerima offer:", offer);
       await peerConnection.setRemoteDescription(
         new RTCSessionDescription(offer)
       );
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
+      console.log("Mengirim jawaban:", answer);
       set(ref(db, `rooms/${roomCode}/answer`), {
         sdp: answer.sdp,
         type: answer.type,
@@ -271,18 +283,3 @@ function showToast(msg) {
     backgroundColor: "#8b5cf6",
   }).showToast();
 }
-console.log("Track diterima dari pasangan:", e.streams);
-console.log("Mengirim offer:", offer);
-console.log("Jawaban diterima:", answerDesc);
-console.log("Menerima offer:", offer);
-console.log("Mengirim jawaban:", answer);
-console.log("Remote stream:", e.streams[0]);
-console.error("Gagal mengakses kamera:", error);
-console.error("Stream belum siap!");
-peerConnection.oniceconnectionstatechange = () => {
-  console.log("ICE connection state:", peerConnection.iceConnectionState);
-};
-
-peerConnection.onconnectionstatechange = () => {
-  console.log("Peer connection state:", peerConnection.connectionState);
-};
