@@ -76,13 +76,21 @@
       <div class="flex flex-wrap justify-center gap-6">
         <div>
           <p class="font-medium mb-1 text-purple-700">Kamera Kamu</p>
-          <video
-            id="localVideo"
-            autoplay
-            playsinline
-            muted
-            class="w-64 h-64 object-cover rounded-2xl shadow-xl border-4 border-pink-200"
-          ></video>
+          <div class="relative w-64 h-64">
+            <video
+              id="localVideo"
+              autoplay
+              playsinline
+              muted
+              class="w-full h-full object-cover rounded-2xl shadow-xl border-4 border-pink-200"
+            ></video>
+            <div
+              id="countdown"
+              class="absolute inset-0 flex items-center justify-center text-white text-6xl font-bold z-50 hidden bg-black bg-opacity-50 rounded-2xl"
+            >
+              3
+            </div>
+          </div>
         </div>
         <div>
           <p class="font-medium mb-1 text-purple-700">Pasanganmu</p>

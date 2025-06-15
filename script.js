@@ -246,23 +246,25 @@ captureBtn.onclick = () => {
       showToast("Menunggu pasangan...");
 
       const partnerKey = isMaster ? "client" : "master";
-      onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), async (snap) => {
-        const partnerImg = snap.val();
-        if (partnerImg && !partnerCaptured) {
-          partnerCaptured = true;
-          setTimeout(() => {
-            combineImages(myCapture, partnerImg);
-            partnerCaptured = false;
-            remove(ref(db, `rooms/${roomCode}/capture`));
-          }, 500);
+      onValue(
+        ref(db, `rooms/${roomCode}/capture/${partnerKey}`),
+        async (snap) => {
+          const partnerImg = snap.val();
+          if (partnerImg && !partnerCaptured) {
+            partnerCaptured = true;
+            setTimeout(() => {
+              combineImages(myCapture, partnerImg);
+              partnerCaptured = false;
+              remove(ref(db, `rooms/${roomCode}/capture`));
+            }, 500);
+          }
         }
-      });
+      );
     } else {
       countdownElement.textContent = count;
     }
   }, 1000);
 };
-
 
 function combineImages(img1, img2) {
   const left = new Image();
