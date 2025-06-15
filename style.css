@@ -1,0 +1,48 @@
+body {
+  font-family: sans-serif;
+  text-align: center;
+  padding: 2rem;
+  background: #f5f5fa;
+}
+
+input {
+  padding: 0.5rem;
+  font-size: 1rem;
+  margin-right: 0.5rem;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  margin: 0.2rem;
+  cursor: pointer;
+}
+
+.booth {
+  margin-top: 2rem;
+}
+
+.videos {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+video {
+  width: 200px;
+  height: 150px;
+  background: black;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+canvas {
+  margin-top: 1rem;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+}
+
+.hidden {
+  display: none;
+}

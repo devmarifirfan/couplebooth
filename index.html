@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photobooth Berdua</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>📸 Photobooth Bareng Pasangan</h1>
+
+  <div class="room-input">
+    <input id="roomInput" placeholder="Masukkan Room Code..." />
+    <button onclick="generateRoomCode()">🎲 Generate</button>
+    <button onclick="joinRoom()">🚪 Join Room</button>
+  </div>
+
+  <div id="booth" class="hidden booth">
+    <div class="videos">
+      <video id="localVideo" autoplay muted playsinline></video>
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+    <button id="captureBtn">📷 Capture Berdua</button>
+    <a id="downloadLink" download="photobooth.png">💾 Download Hasil</a>
+    <canvas id="canvas" class="hidden"></canvas>
+  </div>
+
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
