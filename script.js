@@ -1,4 +1,4 @@
-import { db, ref, onValue, set } from "./firebase-config.js";
+import { db, ref, onValue, set, get } from "./firebase-config.js";
 
 const roomInput = document.getElementById("roomInput");
 const booth = document.getElementById("booth");
@@ -10,65 +10,57 @@ const downloadLink = document.getElementById("downloadLink");
 
 let roomCode = "";
 let stream = null;
-let role = "user1";
 
-// Generate Room Code
 window.generateRoomCode = function () {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   roomInput.value = code;
   alert(`Bagikan kode ini ke pasanganmu: ${code}`);
 };
 
-// Join Room
 window.joinRoom = async function () {
   roomCode = roomInput.value.trim();
   if (!roomCode) return alert("Masukkan Room Code terlebih dahulu!");
-
   booth.classList.remove("hidden");
+
+  // Deteksi user1/user2 berdasarkan isi database
+  const user1Ref = ref(db, `rooms/${roomCode}/user1`);
+  const snapshot = await get(user1Ref);
+
+  let userPath = "user1";
+  if (snapshot.exists()) userPath = "user2";
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: true });
     localVideo.srcObject = stream;
-  } catch (e) {
+
+    const videoTrack = stream.getVideoTracks()[0];
+    const imageCapture = new ImageCapture(videoTrack);
+
+    setInterval(async () => {
+      try {
+        const blob = await imageCapture.takePhoto();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          set(ref(db, `rooms/${roomCode}/${userPath}`), reader.result);
+        };
+        reader.readAsDataURL(blob);
+      } catch (e) {
+        console.log("Photo error:", e);
+      }
+    }, 1500);
+  } catch (error) {
     alert("Tidak bisa mengakses kamera. Pastikan kamu memberi izin.");
     return;
   }
 
-  // Cek apakah user1 sudah diisi
-  const user1Ref = ref(db, `rooms/${roomCode}/user1`);
-  onValue(user1Ref, (snapshot) => {
-    if (snapshot.exists()) {
-      role = "user2";
-    }
-    startStreaming();
-  }, { onlyOnce: true });
-};
-
-function startStreaming() {
-  const myRef = ref(db, `rooms/${roomCode}/${role}`);
-  const otherRef = ref(db, `rooms/${roomCode}/${role === "user1" ? "user2" : "user1"}`);
-
-  const tempCanvas = document.createElement("canvas");
-  const ctx = tempCanvas.getContext("2d");
-
-  setInterval(() => {
-    if (!localVideo.videoWidth) return;
-
-    tempCanvas.width = localVideo.videoWidth;
-    tempCanvas.height = localVideo.videoHeight;
-    ctx.drawImage(localVideo, 0, 0, tempCanvas.width, tempCanvas.height);
-
-    const dataUrl = tempCanvas.toDataURL("image/jpeg", 0.7);
-    set(myRef, dataUrl);
-  }, 1500);
-
-  onValue(otherRef, (snapshot) => {
+  // Tampilkan pasangan
+  const partnerPath = userPath === "user1" ? "user2" : "user1";
+  onValue(ref(db, `rooms/${roomCode}/${partnerPath}`), (snapshot) => {
     const dataUrl = snapshot.val();
     if (dataUrl) remoteVideo.src = dataUrl;
   });
-}
+};
 
-// Gabungkan Foto
 captureBtn.onclick = () => {
   const width = 400, height = 150;
   canvas.width = width;
