@@ -182,28 +182,28 @@ function listenForOffer() {
   });
 }
 
-// function renderEmptyStrips() {
-//   photoGallery.innerHTML = "";
-//   for (let i = 0; i < totalStrips; i++) {
-//     const placeholder = document.createElement("div");
-//     placeholder.classList.add(
-//       "w-full",
-//       "h-[120px]",
-//       "rounded",
-//       "border-2",
-//       "border-dashed",
-//       "border-purple-300",
-//       "flex",
-//       "items-center",
-//       "justify-center",
-//       "text-sm",
-//       "text-purple-400",
-//       "mb-2"
-//     );
-//     placeholder.textContent = `Strip ${i + 1}`;
-//     photoGallery.appendChild(placeholder);
-//   }
-// }
+function renderEmptyStrips() {
+  photoGallery.innerHTML = "";
+  for (let i = 0; i < totalStrips; i++) {
+    const placeholder = document.createElement("div");
+    placeholder.classList.add(
+      "w-full",
+      "h-[120px]",
+      "rounded",
+      "border-2",
+      "border-dashed",
+      "border-purple-300",
+      "flex",
+      "items-center",
+      "justify-center",
+      "text-sm",
+      "text-purple-400",
+      "mb-2"
+    );
+    placeholder.textContent = `Strip ${i + 1}`;
+    photoGallery.appendChild(placeholder);
+  }
+}
 
 captureBtn.onclick = () => {
   if (capturedImages.length >= totalStrips) {
