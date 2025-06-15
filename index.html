@@ -73,6 +73,8 @@
             autoplay
             playsinline
             class="w-64 h-64 object-cover rounded shadow border"
+            onloadedmetadata="console.log('Remote video loaded metadata')"
+            onplaying="console.log('Remote video is playing')"
           ></video>
         </div>
       </div>
