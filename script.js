@@ -32,7 +32,24 @@ let partnerCaptured = false;
 let myCapture = null;
 
 const rtcConfig = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    {
+      urls: "turn:abcd1234.relay.metered.ca:80",
+      username: "abcd1234",
+      credential: "xyz7890",
+    },
+    {
+      urls: "turn:abcd1234.relay.metered.ca:443",
+      username: "abcd1234",
+      credential: "xyz7890",
+    },
+    {
+      urls: "turn:abcd1234.relay.metered.ca:443?transport=tcp",
+      username: "abcd1234",
+      credential: "xyz7890",
+    },
+  ],
 };
 
 window.generateRoom = async () => {
