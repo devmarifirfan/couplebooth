@@ -10,9 +10,6 @@
       href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
     />
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-    <!-- Firebase Config -->
-    <script type="module" src="./firebase-config.js"></script>
-
     <style>
       @keyframes float {
         0% {
@@ -121,41 +118,19 @@
       </button>
 
       <!-- Preview Area -->
-      <div id="previewArea" class="mt-6 space-y-4">
-        <h2 class="text-lg font-semibold text-pink-600">Hasil Strip</h2>
-
-        <!-- Galeri Foto -->
+      <div id="previewArea" class="mt-6">
+        <h2 class="text-lg font-semibold mb-2 text-pink-600">Hasil Strip</h2>
         <div
           id="photoGallery"
           class="flex flex-wrap justify-center gap-3"
         ></div>
-
-        <!-- Frame Selector -->
-        <div class="mt-4" id="frameCheckboxes">
-          <p class="font-medium text-purple-700 mb-1">Pilih Frame Strip:</p>
-          <label class="inline-flex items-center mr-4">
-            <input type="checkbox" value="0" checked class="mr-2" />
-            Frame 1
-          </label>
-          <label class="inline-flex items-center mr-4">
-            <input type="checkbox" value="1" checked class="mr-2" />
-            Frame 2
-          </label>
-          <label class="inline-flex items-center mr-4">
-            <input type="checkbox" value="2" checked class="mr-2" />
-            Frame 3
-          </label>
-          <label class="inline-flex items-center mr-4">
-            <input type="checkbox" value="none" checked class="mr-2" />
-            Tanpa Frame
-          </label>
-        </div>
-
-        <!-- Tombol Download akan muncul di sini -->
-        <div
-          id="downloadLinksContainer"
-          class="flex flex-wrap gap-4 justify-center hidden mt-4"
-        ></div>
+        <a
+          id="downloadStripLink"
+          class="mt-4 inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded shadow hidden transition-transform duration-300 hover:scale-105"
+          download="strip.png"
+        >
+          📥 Download Strip
+        </a>
       </div>
     </div>
 
