@@ -6,6 +6,7 @@ import {
   remove,
   push,
   onChildAdded,
+  off
 } from "./firebase-config.js";
 
 const roomInput = document.getElementById("roomInput");
@@ -56,6 +57,15 @@ window.joinRoom = async () => {
   await setupCamera();
   setupConnection();
   renderEmptyStrips();
+
+  const myKey = isMaster ? "master" : "client";
+  const partnerKey = isMaster ? "client" : "master";
+  onValue(ref(db, `rooms/${roomCode}/capturedBy`), (snap) => {
+    const who = snap.val();
+    if (who && who !== myKey) {
+      showToast("Giliran kamu capture!");
+    }
+  });
 };
 
 async function setupCamera() {
@@ -77,9 +87,7 @@ window.flipCamera = async () => {
   if (stream) stream.getTracks().forEach((track) => track.stop());
   await setupCamera();
   if (peerConnection) {
-    const sender = peerConnection
-      .getSenders()
-      .find((s) => s.track.kind === "video");
+    const sender = peerConnection.getSenders().find((s) => s.track.kind === "video");
     if (sender) sender.replaceTrack(stream.getVideoTracks()[0]);
   }
 };
@@ -97,10 +105,8 @@ function setupConnection() {
   });
 
   peerConnection.ontrack = (e) => {
-    console.log("Track diterima dari pasangan:", e.streams);
     if (e.streams && e.streams[0]) {
       remoteVideo.srcObject = e.streams[0];
-      console.log("Remote stream:", e.streams[0]);
     }
   };
 
@@ -114,14 +120,6 @@ function setupConnection() {
     }
   };
 
-  peerConnection.oniceconnectionstatechange = () => {
-    console.log("ICE connection state:", peerConnection.iceConnectionState);
-  };
-
-  peerConnection.onconnectionstatechange = () => {
-    console.log("Peer connection state:", peerConnection.connectionState);
-  };
-
   if (isMaster) {
     createOffer();
   } else {
@@ -131,17 +129,13 @@ function setupConnection() {
 
 async function createOffer() {
   const offer = await peerConnection.createOffer();
-  console.log("Mengirim offer:", offer);
   await peerConnection.setLocalDescription(offer);
-  set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
+  set(ref(db, `rooms/${roomCode}/offer`), offer);
 
   onValue(ref(db, `rooms/${roomCode}/answer`), async (snapshot) => {
     const data = snapshot.val();
     if (data && !peerConnection.currentRemoteDescription) {
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(data)
-      );
-      console.log("Jawaban diterima:", data);
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
@@ -158,18 +152,10 @@ function listenForOffer() {
   onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
     const offer = snap.val();
     if (offer) {
-      console.log("Menerima offer:", offer);
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(offer)
-      );
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-      console.log("Mengirim jawaban:", answer);
-      set(ref(db, `rooms/${roomCode}/answer`), {
-        sdp: answer.sdp,
-        type: answer.type,
-      });
-
+      set(ref(db, `rooms/${roomCode}/answer`), answer);
       statusText.textContent = "Status: Terhubung!";
       showToast("Terhubung ke pasangan!");
 
@@ -187,7 +173,7 @@ function renderEmptyStrips() {
   for (let i = 0; i < totalStrips; i++) {
     const placeholder = document.createElement("div");
     placeholder.classList.add(
-      "w-full",
+      "w-40",
       "h-[120px]",
       "rounded",
       "border-2",
@@ -205,7 +191,7 @@ function renderEmptyStrips() {
   }
 }
 
-captureBtn.onclick = () => {
+captureBtn.onclick = async () => {
   if (capturedImages.length >= totalStrips) {
     showToast("Strip sudah penuh!");
     return;
@@ -219,11 +205,14 @@ captureBtn.onclick = () => {
   myCapture = canvas.toDataURL("image/png");
 
   const userKey = isMaster ? "master" : "client";
-  set(ref(db, `rooms/${roomCode}/capture/${userKey}`), myCapture);
+  const partnerKey = isMaster ? "client" : "master";
+
+  await set(ref(db, `rooms/${roomCode}/capture/${userKey}`), myCapture);
+  await set(ref(db, `rooms/${roomCode}/capturedBy`), userKey);
   showToast("Menunggu pasangan...");
 
-  const partnerKey = isMaster ? "client" : "master";
-  onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), async (snap) => {
+  const partnerRef = ref(db, `rooms/${roomCode}/capture/${partnerKey}`);
+  const listener = onValue(partnerRef, async (snap) => {
     const partnerImg = snap.val();
     if (partnerImg && !partnerCaptured) {
       partnerCaptured = true;
@@ -235,6 +224,7 @@ captureBtn.onclick = () => {
           setTimeout(updateDownload, 1000);
         }
       }, 500);
+      off(partnerRef);
     }
   });
 };
@@ -259,7 +249,7 @@ function combineImages(img1, img2) {
 
       const img = document.createElement("img");
       img.src = finalImg;
-      img.classList.add("w-full", "border", "rounded");
+      img.classList.add("w-40", "max-h-60", "object-cover", "border", "rounded", "shadow");
 
       const placeholders = photoGallery.querySelectorAll("div");
       const index = capturedImages.length - 1;
