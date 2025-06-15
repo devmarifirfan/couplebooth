@@ -26,3 +26,15 @@ button, input, a {
 .hidden {
   display: none;
 }
+
+#photoList img {
+  border: 2px solid #ccc;
+  margin-bottom: 5px;
+  display: block;
+}
+
+#photoList a {
+  display: block;
+  margin-bottom: 10px;
+  color: #3366cc;
+}

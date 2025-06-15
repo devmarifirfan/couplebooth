@@ -18,9 +18,17 @@
     <p id="statusText">Status: Menunggu...</p>
     <br />
     <button id="captureBtn">📷 Ambil Foto Berdua</button>
-    <a id="downloadLink" download="hasil-berdua.png">📥 Download Strip</a>
+    <a id="downloadLink" download="hasil-berdua-strip.png">📥 Download Strip</a>
     <br />
     <canvas id="canvas" class="hidden"></canvas>
+
+    <!-- Galeri Foto -->
+    <div id="photoGallery" class="hidden">
+      <h2>🖼️ Galeri Foto</h2>
+      <div id="photoList" style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;"></div>
+      <br />
+      <button id="downloadStripBtn">📥 Download Semua dalam Strip</button>
+    </div>
   </div>
 
   <script type="module" src="./script.js"></script>

@@ -1,4 +1,4 @@
-import { db, ref, onValue, set, get, update } from "./firebase-config.js";
+import { db, ref, onValue, set, get } from "./firebase-config.js";
 
 const roomInput = document.getElementById("roomInput");
 const booth = document.getElementById("booth");
@@ -7,13 +7,16 @@ const remoteImg = document.getElementById("remoteImg");
 const canvas = document.getElementById("canvas");
 const captureBtn = document.getElementById("captureBtn");
 const downloadLink = document.getElementById("downloadLink");
+const photoGallery = document.getElementById("photoGallery");
+const photoList = document.getElementById("photoList");
+const downloadStripBtn = document.getElementById("downloadStripBtn");
 const statusText = document.getElementById("statusText");
 
 let roomCode = "";
-let userPath = "";
-let partnerPath = "";
-let photoIndex = 1;
+let userPath = "user1";
+let partnerPath = "user2";
 let stream = null;
+let photos = []; // Menyimpan 4 foto (dataURL)
 
 window.generateRoomCode = function () {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -26,6 +29,7 @@ window.joinRoom = async function () {
   if (!roomCode) return alert("Masukkan Room Code terlebih dahulu!");
   booth.classList.remove("hidden");
 
+  // Deteksi user1/user2
   const user1Ref = ref(db, `rooms/${roomCode}/user1`);
   const snapshot = await get(user1Ref);
   userPath = snapshot.exists() ? "user2" : "user1";
@@ -42,84 +46,85 @@ window.joinRoom = async function () {
       const ctx = tempCanvas.getContext("2d");
       ctx.drawImage(localVideo, 0, 0, 320, 240);
       const dataURL = tempCanvas.toDataURL("image/jpeg");
+
       set(ref(db, `rooms/${roomCode}/${userPath}`), dataURL);
     }, 1500);
-  } catch (e) {
-    alert("Tidak bisa akses kamera");
+  } catch (error) {
+    alert("Tidak bisa mengakses kamera. Pastikan kamu memberi izin.");
     return;
   }
 
-  // Tampilkan pasangan
-  onValue(ref(db, `rooms/${roomCode}/${partnerPath}`), (snap) => {
-    const val = snap.val();
-    if (val) remoteImg.src = val;
+  onValue(ref(db, `rooms/${roomCode}/${partnerPath}`), (snapshot) => {
+    const dataUrl = snapshot.val();
+    if (dataUrl) {
+      remoteImg.src = dataUrl;
+      statusText.textContent = "Status: Terhubung!";
+    } else {
+      statusText.textContent = "Status: Menunggu pasangan...";
+    }
   });
 };
 
-captureBtn.onclick = async () => {
-  if (photoIndex > 4) return alert("Sudah ambil 4 foto!");
+captureBtn.onclick = () => {
+  if (photos.length >= 4) {
+    alert("Sudah 4 foto. Silakan unduh.");
+    return;
+  }
 
-  // 1. Ambil frame lokal
   const tempCanvas = document.createElement("canvas");
-  tempCanvas.width = 320;
-  tempCanvas.height = 240;
+  tempCanvas.width = 400;
+  tempCanvas.height = 150;
   const ctx = tempCanvas.getContext("2d");
-  ctx.drawImage(localVideo, 0, 0, 320, 240);
-  const localData = tempCanvas.toDataURL("image/jpeg");
 
-  // 2. Set ready status
-  const readyPath = `rooms/${roomCode}/ready${userPath === "user1" ? "1" : "2"}`;
-  await set(ref(db, readyPath), true);
-  statusText.innerText = "Menunggu pasangan...";
+  // Set ukuran lokal & pasangan
+  ctx.drawImage(localVideo, 0, 0, 200, 150);
+  ctx.drawImage(remoteImg, 200, 0, 200, 150);
 
-  // 3. Tunggu sampai pasangan ready
-  const checkInterval = setInterval(async () => {
-    const snap1 = await get(ref(db, `rooms/${roomCode}/ready1`));
-    const snap2 = await get(ref(db, `rooms/${roomCode}/ready2`));
-    if (snap1.val() && snap2.val()) {
-      clearInterval(checkInterval);
-      statusText.innerText = "Mengambil foto...";
+  const imageURL = tempCanvas.toDataURL("image/png");
+  photos.push(imageURL);
 
-      // 4. Ambil frame pasangan
-      const partnerSnap = await get(ref(db, `rooms/${roomCode}/${partnerPath}`));
-      const partnerData = partnerSnap.val();
+  // Tampilkan thumbnail dan tombol unduh
+  const wrapper = document.createElement("div");
+  wrapper.style.textAlign = "center";
 
-      // 5. Gabungkan
-      canvas.width = 640;
-      canvas.height = 240 * 4;
-      const ctx = canvas.getContext("2d");
-      const yOffset = (photoIndex - 1) * 240;
+  const img = document.createElement("img");
+  img.src = imageURL;
+  img.width = 150;
 
-      const localImg = new Image();
-      const remoteImgTag = new Image();
-      localImg.src = localData;
-      remoteImgTag.src = partnerData;
+  const btn = document.createElement("a");
+  btn.href = imageURL;
+  btn.download = `photo-${photos.length}.png`;
+  btn.textContent = `⬇️ Download ${photos.length}`;
 
-      localImg.onload = () => {
-        remoteImgTag.onload = () => {
-          ctx.drawImage(localImg, 0, yOffset, 320, 240);
-          ctx.drawImage(remoteImgTag, 320, yOffset, 320, 240);
+  wrapper.appendChild(img);
+  wrapper.appendChild(btn);
+  photoList.appendChild(wrapper);
 
-          // 6. Simpan ke database
-          const photoPath = `rooms/${roomCode}/photos/photo${photoIndex}`;
-          set(ref(db, photoPath), canvas.toDataURL("image/jpeg"));
+  photoGallery.classList.remove("hidden");
+};
 
-          // 7. Reset
-          update(ref(db, `rooms/${roomCode}`), {
-            ready1: false,
-            ready2: false
-          });
+// Gabungkan semua foto jadi 1 strip vertikal
+downloadStripBtn.onclick = () => {
+  if (photos.length === 0) return alert("Belum ada foto!");
 
-          if (photoIndex === 4) {
-            statusText.innerText = "Selesai! Bisa download sekarang.";
-            downloadLink.href = canvas.toDataURL("image/png");
-          } else {
-            statusText.innerText = `Foto ${photoIndex} selesai!`;
-          }
+  const stripCanvas = document.createElement("canvas");
+  const width = 400;
+  const heightPerPhoto = 150;
+  stripCanvas.width = width;
+  stripCanvas.height = photos.length * heightPerPhoto;
+  const ctx = stripCanvas.getContext("2d");
 
-          photoIndex++;
-        };
-      };
-    }
-  }, 1000);
+  photos.forEach((dataUrl, i) => {
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, i * heightPerPhoto, width, heightPerPhoto);
+
+      if (i === photos.length - 1) {
+        const stripURL = stripCanvas.toDataURL("image/png");
+        downloadLink.href = stripURL;
+        downloadLink.click(); // auto download
+      }
+    };
+    img.src = dataUrl;
+  });
 };
