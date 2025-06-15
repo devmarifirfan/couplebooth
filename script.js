@@ -1,225 +1,177 @@
-import { db, ref, onValue, set, get } from "./firebase-config.js";
+import { db, ref, set, onValue, remove } from "./firebase-config.js";
 
 const roomInput = document.getElementById("roomInput");
 const booth = document.getElementById("booth");
 const localVideo = document.getElementById("localVideo");
-const remoteImg = document.getElementById("remoteImg");
+const remoteVideo = document.getElementById("remoteVideo");
 const statusText = document.getElementById("statusText");
 const captureBtn = document.getElementById("captureBtn");
-const countdown = document.getElementById("countdown");
+const stripCountSelect = document.getElementById("stripCount");
+const stripSelector = document.getElementById("stripSelector");
 const photoGallery = document.getElementById("photoGallery");
-const canvas = document.getElementById("canvas");
 const downloadStripLink = document.getElementById("downloadStripLink");
-const stripSelect = document.getElementById("stripSelect");
-const flipBtn = document.getElementById("flipBtn");
+const canvas = document.getElementById("canvas");
 
 let roomCode = "";
-let userPath = "user1";
-let partnerPath = "user2";
 let isMaster = false;
-let videoDevices = [];
-let currentDeviceIndex = 0;
-let currentStream = null;
+let stream;
+let peerConnection;
 let capturedImages = [];
-let expectedStrips = 3;
-let selfCaptured = false;
-let waitingPartner = false;
+let totalStrips = 3;
+let readyState = { local: false, remote: false };
 
-window.generateRoomCode = function () {
-  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  roomInput.value = code;
-  alert(`Bagikan kode ini ke pasanganmu: ${code}`);
+// STUN Google
+const rtcConfig = {
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
-window.joinRoom = async function () {
+window.generateRoom = async () => {
+  roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  roomInput.value = roomCode;
+  isMaster = true;
+  showToast("Room dibuat, bagikan ke pasangan.");
+  stripSelector.classList.remove("hidden");
+};
+
+window.joinRoom = async () => {
   roomCode = roomInput.value.trim();
-  if (!roomCode) return showToast("Masukkan Room Code terlebih dahulu!");
+  if (!roomCode) return alert("Masukkan Room Code!");
+
+  totalStrips = parseInt(stripCountSelect.value);
   booth.classList.remove("hidden");
 
-  const user1Ref = ref(db, `rooms/${roomCode}/user1`);
-  const snapshot = await get(user1Ref);
-  if (snapshot.exists()) {
-    userPath = "user2";
-    partnerPath = "user1";
-    isMaster = false;
-    stripSelect.classList.add("hidden");
+  stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  localVideo.srcObject = stream;
+
+  peerConnection = new RTCPeerConnection(rtcConfig);
+  stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+
+  peerConnection.ontrack = (e) => {
+    remoteVideo.srcObject = e.streams[0];
+  };
+
+  peerConnection.onicecandidate = (e) => {
+    if (e.candidate) {
+      set(ref(db, `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`), e.candidate.toJSON());
+    }
+  };
+
+  if (isMaster) {
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
+
+    onValue(ref(db, `rooms/${roomCode}/answer`), async (snapshot) => {
+      const data = snapshot.val();
+      if (data && !peerConnection.currentRemoteDescription) {
+        const answerDesc = new RTCSessionDescription(data);
+        await peerConnection.setRemoteDescription(answerDesc);
+        statusText.textContent = "Status: Terhubung!";
+        showToast("Pasangan terhubung!");
+      }
+    });
+
+    onValue(ref(db, `rooms/${roomCode}/calleeCandidates`), async (snap) => {
+      const data = snap.val();
+      if (data) peerConnection.addIceCandidate(new RTCIceCandidate(data));
+    });
+
   } else {
-    isMaster = true;
-    stripSelect.classList.remove("hidden");
+    const offerSnap = await ref(db, `rooms/${roomCode}/offer`);
+    onValue(offerSnap, async (snap) => {
+      const offer = snap.val();
+      if (offer) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        set(ref(db, `rooms/${roomCode}/answer`), { sdp: answer.sdp, type: answer.type });
+        statusText.textContent = "Status: Terhubung!";
+        showToast("Terhubung ke pasangan!");
+
+        onValue(ref(db, `rooms/${roomCode}/callerCandidates`), async (snap2) => {
+          const data = snap2.val();
+          if (data) peerConnection.addIceCandidate(new RTCIceCandidate(data));
+        });
+      }
+    });
+  }
+};
+
+captureBtn.onclick = () => {
+  if (capturedImages.length >= totalStrips) {
+    showToast("Strip sudah penuh!");
+    return;
   }
 
-  await getVideoDevices();
-  await startCamera();
+  // Kirim status siap capture
+  const userKey = isMaster ? "master" : "client";
+  set(ref(db, `rooms/${roomCode}/capture/${userKey}`), true);
+  showToast("Menunggu pasangan mengambil foto...");
 
-  const partnerRef = ref(db, `rooms/${roomCode}/${partnerPath}`);
-  onValue(partnerRef, (snapshot) => {
-    const data = snapshot.val();
-    if (data?.capture) {
-      if (selfCaptured && !waitingPartner) {
-        mergePhotos(data.capture);
-      } else {
-        waitingPartner = true;
+  // Tunggu pasangan juga siap
+  const partnerKey = isMaster ? "client" : "master";
+  onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), async (snap) => {
+    const isReady = snap.val();
+    if (isReady) {
+      if (!readyState.local) {
+        readyState.local = true;
+        // Delay 300ms for sync
+        setTimeout(() => {
+          captureAndCombine();
+          readyState = { local: false, remote: false };
+          remove(ref(db, `rooms/${roomCode}/capture`)); // Reset
+        }, 300);
       }
     }
   });
-
-  setInterval(() => {
-    if (!currentStream) return;
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = 320;
-    tempCanvas.height = 240;
-    const ctx = tempCanvas.getContext("2d");
-    ctx.drawImage(localVideo, 0, 0, 320, 240);
-    const dataURL = tempCanvas.toDataURL("image/jpeg");
-    set(ref(db, `rooms/${roomCode}/${userPath}/preview`), dataURL);
-  }, 1000);
-
-  const previewRef = ref(db, `rooms/${roomCode}/${partnerPath}/preview`);
-  onValue(previewRef, (snapshot) => {
-    const url = snapshot.val();
-    if (url) {
-      remoteImg.src = url;
-      statusText.textContent = "Status: Terhubung!";
-    }
-  });
 };
 
-flipBtn.onclick = async () => {
-  currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
-  await startCamera();
-};
-
-async function getVideoDevices() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  videoDevices = devices.filter((d) => d.kind === "videoinput");
-}
-
-async function startCamera() {
-  if (currentStream) {
-    currentStream.getTracks().forEach((t) => t.stop());
-  }
-
-  const deviceId = videoDevices[currentDeviceIndex]?.deviceId;
-  currentStream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      deviceId: deviceId ? { exact: deviceId } : undefined,
-      width: 320,
-      height: 240,
-    },
-  });
-
-  localVideo.srcObject = currentStream;
-}
-
-captureBtn.onclick = () => {
-  expectedStrips = parseInt(stripSelect.value || "3");
-  if (capturedImages.length >= expectedStrips) return showToast("Strip penuh!");
-
-  startCountdown(() => {
-    const squareSize = 240;
-    canvas.width = squareSize;
-    canvas.height = squareSize;
-
-    const ctx = canvas.getContext("2d");
-    const cropX = (localVideo.videoWidth - squareSize) / 2;
-    const cropY = (localVideo.videoHeight - squareSize) / 2;
-
-    ctx.drawImage(localVideo, cropX, cropY, squareSize, squareSize, 0, 0, squareSize, squareSize);
-    const imageURL = canvas.toDataURL("image/png");
-    selfCaptured = true;
-
-    set(ref(db, `rooms/${roomCode}/${userPath}/capture`), imageURL);
-
-    if (waitingPartner) {
-      get(ref(db, `rooms/${roomCode}/${partnerPath}/capture`)).then((snap) => {
-        if (snap.exists()) {
-          mergePhotos(snap.val(), imageURL);
-        }
-      });
-      waitingPartner = false;
-    } else {
-      showToast("Menunggu pasangan mengambil gambar...");
-    }
-  });
-};
-
-function mergePhotos(partnerImgURL, selfImgURL = null) {
-  const squareSize = 240;
-  canvas.width = squareSize * 2;
-  canvas.height = squareSize;
+function captureAndCombine() {
+  canvas.width = 640;
+  canvas.height = 240;
 
   const ctx = canvas.getContext("2d");
+  ctx.drawImage(localVideo, 0, 0, 320, 240);
+  ctx.drawImage(remoteVideo, 320, 0, 320, 240);
 
-  const leftImg = new Image();
-  const rightImg = new Image();
+  const imgUrl = canvas.toDataURL("image/png");
+  capturedImages.push(imgUrl);
 
-  leftImg.onload = () => {
-    rightImg.onload = () => {
-      ctx.drawImage(leftImg, 0, 0, squareSize, squareSize);
-      ctx.drawImage(rightImg, squareSize, 0, squareSize, squareSize);
+  const img = document.createElement("img");
+  img.src = imgUrl;
+  img.classList.add("w-40", "border", "rounded");
+  photoGallery.appendChild(img);
 
-      const mergedURL = canvas.toDataURL("image/png");
-      capturedImages.push(mergedURL);
-
-      const img = document.createElement("img");
-      img.src = mergedURL;
-      img.className = "strip-img";
-      photoGallery.appendChild(img);
-      updateStripDownload();
-
-      selfCaptured = false;
-      waitingPartner = false;
-    };
-
-    rightImg.src = selfImgURL || canvas.toDataURL("image/png");
-  };
-
-  leftImg.src = selfImgURL ? partnerImgURL : canvas.toDataURL("image/png");
+  updateDownload();
 }
 
-function updateStripDownload() {
+function updateDownload() {
   if (capturedImages.length < 1) return;
 
   const stripCanvas = document.createElement("canvas");
-  const width = 480;
-  const height = 240 * capturedImages.length;
-  stripCanvas.width = width;
-  stripCanvas.height = height;
+  stripCanvas.width = 640;
+  stripCanvas.height = 240 * capturedImages.length;
 
   const ctx = stripCanvas.getContext("2d");
 
-  capturedImages.forEach((src, i) => {
+  capturedImages.forEach((src, idx) => {
     const img = new Image();
     img.src = src;
-    ctx.drawImage(img, 0, i * 240, 480, 240);
+    img.onload = () => {
+      ctx.drawImage(img, 0, idx * 240, 640, 240);
+      const dataURL = stripCanvas.toDataURL("image/png");
+      downloadStripLink.href = dataURL;
+      downloadStripLink.classList.remove("hidden");
+    };
   });
-
-  const stripURL = stripCanvas.toDataURL("image/png");
-  downloadStripLink.href = stripURL;
 }
 
-function startCountdown(callback) {
-  countdown.classList.remove("hidden");
-  let count = 3;
-  countdown.textContent = count;
-
-  const interval = setInterval(() => {
-    count--;
-    countdown.textContent = count;
-    if (count === 0) {
-      clearInterval(interval);
-      countdown.classList.add("hidden");
-      callback();
-    }
-  }, 1000);
-}
-
-function showToast(message) {
-  const toast = document.createElement("div");
-  toast.textContent = message;
-  toast.className =
-    "fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg z-50";
-  document.body.appendChild(toast);
-
-  setTimeout(() => toast.remove(), 3000);
+function showToast(msg) {
+  Toastify({
+    text: msg,
+    duration: 3000,
+    gravity: "top",
+    position: "right",
+    backgroundColor: "#8b5cf6",
+  }).showToast();
 }
