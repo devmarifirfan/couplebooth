@@ -22,7 +22,7 @@ window.joinRoom = async function () {
   if (!roomCode) return alert("Masukkan Room Code terlebih dahulu!");
   booth.classList.remove("hidden");
 
-  // Deteksi user1/user2 berdasarkan isi database
+  // Deteksi user1/user2
   const user1Ref = ref(db, `rooms/${roomCode}/user1`);
   const snapshot = await get(user1Ref);
 
@@ -33,20 +33,16 @@ window.joinRoom = async function () {
     stream = await navigator.mediaDevices.getUserMedia({ video: true });
     localVideo.srcObject = stream;
 
-    const videoTrack = stream.getVideoTracks()[0];
-    const imageCapture = new ImageCapture(videoTrack);
+    // Capture manual dari video element ke canvas dan convert jadi dataURL
+    setInterval(() => {
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = 320;
+      tempCanvas.height = 240;
+      const ctx = tempCanvas.getContext("2d");
+      ctx.drawImage(localVideo, 0, 0, tempCanvas.width, tempCanvas.height);
+      const dataURL = tempCanvas.toDataURL("image/jpeg");
 
-    setInterval(async () => {
-      try {
-        const blob = await imageCapture.takePhoto();
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          set(ref(db, `rooms/${roomCode}/${userPath}`), reader.result);
-        };
-        reader.readAsDataURL(blob);
-      } catch (e) {
-        console.log("Photo error:", e);
-      }
+      set(ref(db, `rooms/${roomCode}/${userPath}`), dataURL);
     }, 1500);
   } catch (error) {
     alert("Tidak bisa mengakses kamera. Pastikan kamu memberi izin.");

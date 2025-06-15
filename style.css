@@ -1,40 +1,25 @@
 body {
   font-family: sans-serif;
   text-align: center;
-  background-color: #f5f5ff;
-  color: #333;
-  padding: 20px;
+  background: #f9f9f9;
 }
 
 video {
   width: 200px;
   height: 150px;
-  margin: 5px;
   border: 2px solid #ccc;
-  border-radius: 10px;
-  background: black;
+  margin: 5px;
 }
 
 canvas {
-  margin-top: 20px;
-  border: 2px solid #666;
+  margin-top: 10px;
+  border: 2px dashed purple;
 }
 
-button {
-  margin: 10px;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 10px;
-  background-color: #8c52ff;
-  color: white;
-  cursor: pointer;
-}
-
-input {
-  padding: 10px;
-  margin: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
+button, input, a {
+  margin: 5px;
+  padding: 8px 12px;
+  font-size: 14px;
 }
 
 .hidden {
