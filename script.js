@@ -22,49 +22,85 @@ const canvas = document.getElementById("canvas");
 
 let roomCode = "";
 let isMaster = false;
-let stream;
+let localStream;
 let peerConnection;
 let capturedImages = [];
 let totalStrips = 3;
 let currentFacingMode = "user";
-let partnerCaptured = false;
-let myCapture = null;
+let partnerCaptureListenerSet = false;
+
+let remoteStream = new MediaStream();
+remoteVideo.srcObject = remoteStream;
+remoteVideo.muted = true; // supaya autoplay lancar
 
 const rtcConfig = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
 
 window.generateRoom = async () => {
+  // Cleanup dulu kalau sebelumnya ada room
+  if (roomCode) {
+    await cleanupRoom(roomCode);
+  }
   roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
   roomInput.value = roomCode;
   isMaster = true;
-  showToast("Room dibuat, bagikan ke pasangan.");
-  stripSelector.classList.remove("hidden");
-};
-
-window.joinRoom = async () => {
-  roomCode = roomInput.value.trim();
-  if (!roomCode) return alert("Masukkan Room Code!");
-
   totalStrips = parseInt(stripCountSelect.value);
   capturedImages = [];
   photoGallery.innerHTML = "";
   downloadStripLink.classList.add("hidden");
-
+  stripSelector.classList.remove("hidden");
   booth.classList.remove("hidden");
-
+  statusText.textContent = "Status: Membuat Room...";
+  showToast("Room dibuat, bagikan ke pasangan.");
   await setupCamera();
   setupConnection();
+  setupPartnerCaptureListener();
 };
+
+window.joinRoom = async () => {
+  const code = roomInput.value.trim();
+  if (!code) {
+    alert("Masukkan Room Code!");
+    return;
+  }
+  if (roomCode && roomCode !== code) {
+    await cleanupRoom(roomCode);
+  }
+  roomCode = code;
+  isMaster = false;
+  totalStrips = parseInt(stripCountSelect.value);
+  capturedImages = [];
+  photoGallery.innerHTML = "";
+  downloadStripLink.classList.add("hidden");
+  stripSelector.classList.add("hidden");
+  booth.classList.remove("hidden");
+  statusText.textContent = "Status: Bergabung ke Room...";
+  showToast("Menghubungkan ke pasangan...");
+  await setupCamera();
+  setupConnection();
+  setupPartnerCaptureListener();
+};
+
+async function cleanupRoom(code) {
+  try {
+    await remove(ref(db, `rooms/${code}`));
+  } catch (e) {
+    console.warn("Gagal cleanup room:", e);
+  }
+}
 
 async function setupCamera() {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
+    }
+    localStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: currentFacingMode, width: 480, height: 480 },
       audio: false,
     });
-    console.log("Akses kamera berhasil:", stream);
-    localVideo.srcObject = stream;
+    localVideo.srcObject = localStream;
+    console.log("Akses kamera berhasil:", localStream);
   } catch (error) {
     console.error("Gagal mengakses kamera:", error);
     showToast("Gagal mengakses kamera, periksa izin browser.");
@@ -73,33 +109,39 @@ async function setupCamera() {
 
 window.flipCamera = async () => {
   currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
-  if (stream) stream.getTracks().forEach((track) => track.stop());
   await setupCamera();
   if (peerConnection) {
     const sender = peerConnection
       .getSenders()
       .find((s) => s.track.kind === "video");
-    if (sender) sender.replaceTrack(stream.getVideoTracks()[0]);
+    if (sender) sender.replaceTrack(localStream.getVideoTracks()[0]);
   }
 };
 
 function setupConnection() {
-  if (!stream) {
+  if (!localStream) {
     console.error("Stream belum siap!");
     return;
   }
 
   peerConnection = new RTCPeerConnection(rtcConfig);
 
-  stream.getTracks().forEach((track) => {
-    peerConnection.addTrack(track, stream);
+  // Hapus remoteStream lama dulu
+  remoteStream = new MediaStream();
+  remoteVideo.srcObject = remoteStream;
+
+  localStream.getTracks().forEach((track) => {
+    peerConnection.addTrack(track, localStream);
   });
 
   peerConnection.ontrack = (e) => {
-    console.log("Track diterima dari pasangan:", e.streams);
+    // Biasanya e.streams[0] ada
     if (e.streams && e.streams[0]) {
-      remoteVideo.srcObject = e.streams[0];
-      console.log("Remote stream:", e.streams[0]);
+      e.streams[0].getTracks().forEach((track) => {
+        remoteStream.addTrack(track);
+      });
+      remoteVideo.srcObject = remoteStream;
+      console.log("Track diterima dari pasangan:", e.streams[0]);
     }
   };
 
@@ -130,22 +172,24 @@ function setupConnection() {
 
 async function createOffer() {
   const offer = await peerConnection.createOffer();
-  console.log("Mengirim offer:", offer);
   await peerConnection.setLocalDescription(offer);
-  set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
+  await set(ref(db, `rooms/${roomCode}/offer`), {
+    sdp: offer.sdp,
+    type: offer.type,
+  });
+  statusText.textContent = "Status: Menunggu jawaban...";
 
+  // Listen answer
   onValue(ref(db, `rooms/${roomCode}/answer`), async (snapshot) => {
     const data = snapshot.val();
     if (data && !peerConnection.currentRemoteDescription) {
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(data)
-      );
-      console.log("Jawaban diterima:", data);
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
   });
 
+  // Listen callee ICE candidates
   onChildAdded(ref(db, `rooms/${roomCode}/calleeCandidates`), (snap) => {
     if (snap.val()) {
       peerConnection.addIceCandidate(new RTCIceCandidate(snap.val()));
@@ -154,30 +198,27 @@ async function createOffer() {
 }
 
 function listenForOffer() {
-  onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
-    const offer = snap.val();
-    if (offer) {
-      console.log("Menerima offer:", offer);
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(offer)
-      );
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      console.log("Mengirim jawaban:", answer);
-      set(ref(db, `rooms/${roomCode}/answer`), {
-        sdp: answer.sdp,
-        type: answer.type,
-      });
+  onValue(ref(db, `rooms/${roomCode}/offer`), async (snapshot) => {
+    const offer = snapshot.val();
+    if (!offer) return;
 
-      statusText.textContent = "Status: Terhubung!";
-      showToast("Terhubung ke pasangan!");
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    await set(ref(db, `rooms/${roomCode}/answer`), {
+      sdp: answer.sdp,
+      type: answer.type,
+    });
 
-      onChildAdded(ref(db, `rooms/${roomCode}/callerCandidates`), (snap2) => {
-        if (snap2.val()) {
-          peerConnection.addIceCandidate(new RTCIceCandidate(snap2.val()));
-        }
-      });
-    }
+    statusText.textContent = "Status: Terhubung!";
+    showToast("Terhubung ke pasangan!");
+
+    // Listen caller ICE candidates
+    onChildAdded(ref(db, `rooms/${roomCode}/callerCandidates`), (snap) => {
+      if (snap.val()) {
+        peerConnection.addIceCandidate(new RTCIceCandidate(snap.val()));
+      }
+    });
   });
 }
 
@@ -186,71 +227,105 @@ captureBtn.onclick = () => {
     showToast("Strip sudah penuh!");
     return;
   }
+  captureAndSend();
+};
 
+function captureAndSend() {
   const squareSize = 480;
   canvas.width = squareSize;
   canvas.height = squareSize;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(localVideo, 0, 0, squareSize, squareSize);
-  myCapture = canvas.toDataURL("image/png");
+  const myCaptureDataUrl = canvas.toDataURL("image/png");
 
+  // Tampilkan preview di gallery (sementara)
   const imgPreview = document.createElement("img");
-  imgPreview.src = myCapture;
+  imgPreview.src = myCaptureDataUrl;
   imgPreview.classList.add("w-40", "rounded", "border-2", "border-purple-600");
   photoGallery.appendChild(imgPreview);
 
+  // Kirim ke DB
   const userKey = isMaster ? "master" : "client";
-  set(ref(db, `rooms/${roomCode}/capture/${userKey}`), myCapture);
-  showToast("Menunggu pasangan...");
+  set(ref(db, `rooms/${roomCode}/capture/${userKey}`), myCaptureDataUrl);
+  statusText.textContent = "Status: Menunggu pasangan capture...";
+  showToast("Capture terkirim, menunggu pasangan...");
 
-  const partnerKey = isMaster ? "client" : "master";
-  onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), async (snap) => {
-    const partnerImg = snap.val();
-    if (partnerImg && !partnerCaptured) {
-      partnerCaptured = true;
-      setTimeout(() => {
-        combineImages(myCapture, partnerImg);
-        partnerCaptured = false;
-        remove(ref(db, `rooms/${roomCode}/capture`));
-        if (capturedImages.length + 1 === totalStrips) {
-          setTimeout(updateDownload, 1000);
-        }
-      }, 500);
-    }
-  });
-};
-
-function combineImages(img1, img2) {
-  const size = 480;
-  canvas.width = size * 2;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-
-  const left = new Image();
-  const right = new Image();
-  let loaded = 0;
-
-  left.onload = right.onload = () => {
-    loaded++;
-    if (loaded === 2) {
-      ctx.drawImage(left, 0, 0, size, size);
-      ctx.drawImage(right, size, 0, size, size);
-      const finalImg = canvas.toDataURL("image/png");
-      capturedImages.push(finalImg);
-
-      const img = document.createElement("img");
-      img.src = finalImg;
-      img.classList.add("w-full", "border", "rounded");
-      photoGallery.appendChild(img);
-    }
-  };
-
-  left.src = isMaster ? img1 : img2;
-  right.src = isMaster ? img2 : img1;
+  // Kita tidak perlu pasang listener baru di sini, sudah pasang di setupPartnerCaptureListener()
 }
 
-function updateDownload() {
-  if (capturedImages.length < 1) return;
+function setupPartnerCaptureListener() {
+  if (partnerCaptureListenerSet) return; // supaya gak duplikat listener
+  partnerCaptureListenerSet = true;
+
+  const partnerKey = isMaster ? "client" : "master";
+
+  onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), (snapshot) => {
+    const partnerCapture = snapshot.val();
+    if (!partnerCapture) return;
+
+    // Kalau strip penuh, jangan proses lagi
+    if (capturedImages.length >= totalStrips) return;
+
+    // Ambil capture kita dari DB untuk gabung (atau bisa simpan di variabel kalau mau)
+    const userKey = isMaster ? "master" : "client";
+    onValue(ref(db, `rooms/${roomCode}/capture/${userKey}`), (snap) => {
+      const myCaptureDataUrl = snap.val();
+      if (!myCaptureDataUrl) return;
+
+      // Gabung gambar kiri kanan, master kiri, client kanan
+      combineImages(
+        isMaster ? myCaptureDataUrl : partnerCapture,
+        isMaster ? partnerCapture : myCaptureDataUrl
+      );
+
+      // Hapus capture sementara supaya siap untuk capture berikutnya
+      remove(ref(db, `rooms/${roomCode}/capture`));
+
+      // Update status dan jika sudah penuh, aktifkan tombol download
+      if (capturedImages.length + 1 === totalStrips) {
+        setTimeout(updateDownloadLink, 1000);
+      }
+    }, { onlyOnce: true });
+  });
+}
+
+function combineImages(imgLeftSrc, imgRightSrc) {
+  const width = 480;
+  const height = 480;
+  canvas.width = width * 2;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  const leftImg = new Image();
+  const rightImg = new Image();
+
+  let loadedCount = 0;
+  function tryDraw() {
+    loadedCount++;
+    if (loadedCount === 2) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(leftImg, 0, 0, width, height);
+      ctx.drawImage(rightImg, width, 0, width, height);
+
+      const combinedDataUrl = canvas.toDataURL("image/png");
+      capturedImages.push(combinedDataUrl);
+
+      const imgElement = document.createElement("img");
+      imgElement.src = combinedDataUrl;
+      imgElement.classList.add("w-full", "border", "rounded", "mb-3");
+      photoGallery.appendChild(imgElement);
+    }
+  }
+
+  leftImg.onload = tryDraw;
+  rightImg.onload = tryDraw;
+
+  leftImg.src = imgLeftSrc;
+  rightImg.src = imgRightSrc;
+}
+
+function updateDownloadLink() {
+  if (capturedImages.length === 0) return;
 
   const stripCanvas = document.createElement("canvas");
   stripCanvas.width = 960;
@@ -258,7 +333,6 @@ function updateDownload() {
   const ctx = stripCanvas.getContext("2d");
 
   let loadedCount = 0;
-
   capturedImages.forEach((src, index) => {
     const img = new Image();
     img.src = src;
@@ -266,9 +340,12 @@ function updateDownload() {
       ctx.drawImage(img, 0, index * 480, 960, 480);
       loadedCount++;
       if (loadedCount === capturedImages.length) {
-        const dataURL = stripCanvas.toDataURL("image/png");
-        downloadStripLink.href = dataURL;
+        const dataUrl = stripCanvas.toDataURL("image/png");
+        downloadStripLink.href = dataUrl;
         downloadStripLink.classList.remove("hidden");
+        downloadStripLink.download = `strip_${roomCode}.png`;
+        statusText.textContent = "Status: Strip siap didownload!";
+        showToast("Strip siap didownload!");
       }
     };
   });
@@ -280,6 +357,8 @@ function showToast(msg) {
     duration: 3000,
     gravity: "top",
     position: "right",
-    backgroundColor: "#8b5cf6",
+    style: {
+      background: "#8b5cf6",
+    },
   }).showToast();
 }
