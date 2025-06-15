@@ -4,11 +4,12 @@ body {
   background: #f9f9f9;
 }
 
-video {
+video, img {
   width: 200px;
   height: 150px;
   border: 2px solid #ccc;
   margin: 5px;
+  object-fit: cover;
 }
 
 canvas {
