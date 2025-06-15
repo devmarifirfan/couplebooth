@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,74 +11,94 @@
     />
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
   </head>
-  <body class="bg-gray-100 text-center p-6">
-    <h1 class="text-3xl font-bold mb-4">Photobooth buat pacalku yg lagi pgn bgttt tapi kita LDR <3 </h1>
+  <body class="bg-gray-100 text-center p-6 font-sans">
+    <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-purple-700">
+      Photobooth buat pacalku yg lagi pgn bgttt tapi kita LDR 💜
+    </h1>
 
-    <div class="space-y-3">
+    <!-- Room Setup -->
+    <div class="space-y-3 mb-6">
       <input
         type="text"
         id="roomInput"
         placeholder="Kode Room"
-        class="px-4 py-2 border rounded"
+        class="px-4 py-2 border rounded w-64 text-center"
       />
-      <button
-        onclick="generateRoom()"
-        class="bg-purple-600 text-white px-4 py-2 rounded"
-      >
-        🎲 Buat Room
-      </button>
-      <button
-        onclick="joinRoom()"
-        class="bg-green-600 text-white px-4 py-2 rounded"
-      >
-        📥 Join Room
-      </button>
+      <div class="space-x-2">
+        <button
+          onclick="generateRoom()"
+          class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+        >
+          🎲 Buat Room
+        </button>
+        <button
+          onclick="joinRoom()"
+          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+        >
+          📥 Join Room
+        </button>
+      </div>
     </div>
 
+    <!-- Strip Selector -->
     <div id="stripSelector" class="mt-4 hidden">
       <label for="stripCount" class="font-semibold">Jumlah Strip:</label>
-      <select id="stripCount" class="ml-2 px-2 py-1 border rounded">
+      <select
+        id="stripCount"
+        class="ml-2 px-2 py-1 border rounded focus:outline-none"
+      >
         <option value="3">3</option>
         <option value="4">4</option>
         <option value="6">6</option>
       </select>
     </div>
 
-    <div id="booth" class="mt-8 hidden space-y-4">
-      <div class="flex justify-center gap-4">
+    <!-- Booth Section -->
+    <div id="booth" class="mt-10 hidden space-y-6">
+      <div class="flex flex-wrap justify-center gap-6">
         <div>
-          <p class="font-medium">Kamera Kamu</p>
+          <p class="font-medium mb-1">Kamera Kamu</p>
           <video
             id="localVideo"
             autoplay
             playsinline
-            class="w-64 h-48 rounded shadow border"
+            muted
+            class="w-64 h-64 object-cover rounded shadow border"
           ></video>
         </div>
         <div>
-          <p class="font-medium">Pasanganmu</p>
+          <p class="font-medium mb-1">Pasanganmu</p>
           <video
             id="remoteVideo"
             autoplay
             playsinline
-            class="w-64 h-48 rounded shadow border"
+            class="w-64 h-64 object-cover rounded shadow border"
           ></video>
         </div>
       </div>
-      <button
-        onclick="flipCamera()"
-        class="bg-yellow-600 text-white px-4 py-2 rounded"
-      >
-        🔄 Flip Kamera
-      </button>
 
-      <p id="statusText" class="text-sm text-gray-600">
-        Status: Belum Terhubung
-      </p>
-      <button id="captureBtn" class="bg-blue-600 text-white px-6 py-2 rounded">
+      <!-- Flip and Status -->
+      <div class="space-y-2">
+        <button
+          onclick="flipCamera()"
+          class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
+        >
+          🔄 Flip Kamera
+        </button>
+        <p id="statusText" class="text-sm text-gray-600">
+          Status: Belum Terhubung
+        </p>
+      </div>
+
+      <!-- Capture Button -->
+      <button
+        id="captureBtn"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow"
+      >
         📸 Capture
       </button>
 
+      <!-- Preview Area -->
       <div id="previewArea" class="mt-6">
         <h2 class="text-lg font-semibold mb-2">Hasil Strip</h2>
         <div
@@ -87,15 +107,18 @@
         ></div>
         <a
           id="downloadStripLink"
-          class="mt-4 inline-block bg-indigo-600 text-white px-4 py-2 rounded hidden"
+          class="mt-4 inline-block bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded hidden"
           download="strip.png"
-          >📥 Download Strip</a
         >
+          📥 Download Strip
+        </a>
       </div>
     </div>
 
+    <!-- Hidden Canvas -->
     <canvas id="canvas" class="hidden"></canvas>
 
+    <!-- Main Script -->
     <script type="module" src="./script.js"></script>
   </body>
 </html>

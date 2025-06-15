@@ -19,9 +19,8 @@ let peerConnection;
 let capturedImages = [];
 let totalStrips = 3;
 let currentFacingMode = "user";
-let readyState = { local: false, remote: false };
-let myCapture = null;
 let partnerCaptured = false;
+let myCapture = null;
 
 const rtcConfig = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -40,6 +39,10 @@ window.joinRoom = async () => {
   if (!roomCode) return alert("Masukkan Room Code!");
 
   totalStrips = parseInt(stripCountSelect.value);
+  capturedImages = [];
+  photoGallery.innerHTML = "";
+  downloadStripLink.classList.add("hidden");
+
   booth.classList.remove("hidden");
 
   await setupCamera();
@@ -56,27 +59,28 @@ async function setupCamera() {
 
 window.flipCamera = async () => {
   currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-  }
+  if (stream) stream.getTracks().forEach(track => track.stop());
   await setupCamera();
   if (peerConnection) {
     const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
-    sender.replaceTrack(stream.getVideoTracks()[0]);
+    if (sender) sender.replaceTrack(stream.getVideoTracks()[0]);
   }
 };
 
 function setupConnection() {
   peerConnection = new RTCPeerConnection(rtcConfig);
-  stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+  stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
 
   peerConnection.ontrack = (e) => {
-    remoteVideo.srcObject = e.streams[0];
+    if (!remoteVideo.srcObject) {
+      remoteVideo.srcObject = e.streams[0];
+    }
   };
 
   peerConnection.onicecandidate = (e) => {
     if (e.candidate) {
-      set(ref(db, `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`), e.candidate.toJSON());
+      const candidateRef = ref(db, `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`);
+      set(candidateRef, e.candidate.toJSON());
     }
   };
 
@@ -159,14 +163,19 @@ captureBtn.onclick = () => {
         combineImages(myCapture, partnerImg);
         partnerCaptured = false;
         remove(ref(db, `rooms/${roomCode}/capture`));
+
+        if (capturedImages.length + 1 === totalStrips) {
+          setTimeout(updateDownload, 1000);
+        }
       }, 500);
     }
   });
 };
 
 function combineImages(img1, img2) {
-  canvas.width = 960;
-  canvas.height = 480;
+  const size = 480;
+  canvas.width = size * 2;
+  canvas.height = size;
   const ctx = canvas.getContext("2d");
 
   const left = new Image();
@@ -176,17 +185,15 @@ function combineImages(img1, img2) {
   left.onload = right.onload = () => {
     loaded++;
     if (loaded === 2) {
-      ctx.drawImage(left, 0, 0, 480, 480);
-      ctx.drawImage(right, 480, 0, 480, 480);
+      ctx.drawImage(left, 0, 0, size, size);
+      ctx.drawImage(right, size, 0, size, size);
       const finalImg = canvas.toDataURL("image/png");
       capturedImages.push(finalImg);
 
       const img = document.createElement("img");
       img.src = finalImg;
-      img.classList.add("w-40", "border", "rounded");
+      img.classList.add("w-full", "border", "rounded");
       photoGallery.appendChild(img);
-
-      updateDownload();
     }
   };
 
