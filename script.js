@@ -1,4 +1,12 @@
-import { db, ref, set, onValue, remove, push, onChildAdded } from "./firebase-config.js";
+import {
+  db,
+  ref,
+  set,
+  onValue,
+  remove,
+  push,
+  onChildAdded,
+} from "./firebase-config.js";
 
 const roomInput = document.getElementById("roomInput");
 const booth = document.getElementById("booth");
@@ -67,7 +75,9 @@ window.flipCamera = async () => {
   if (stream) stream.getTracks().forEach((track) => track.stop());
   await setupCamera();
   if (peerConnection) {
-    const sender = peerConnection.getSenders().find((s) => s.track.kind === "video");
+    const sender = peerConnection
+      .getSenders()
+      .find((s) => s.track.kind === "video");
     if (sender) sender.replaceTrack(stream.getVideoTracks()[0]);
   }
 };
@@ -89,7 +99,12 @@ function setupConnection() {
 
   peerConnection.onicecandidate = (e) => {
     if (e.candidate) {
-      const candidateRef = ref(db, `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`);
+      const candidateRef = ref(
+        db,
+        `rooms/${roomCode}/${
+          isMaster ? "callerCandidates" : "calleeCandidates"
+        }`
+      );
       push(candidateRef, e.candidate.toJSON()); // ✅ pakai push
     }
   };
@@ -113,7 +128,9 @@ async function createOffer() {
   onValue(ref(db, `rooms/${roomCode}/answer`), async (snapshot) => {
     const data = snapshot.val();
     if (data && !peerConnection.currentRemoteDescription) {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(data)
+      );
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
@@ -130,10 +147,15 @@ function listenForOffer() {
   onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
     const offer = snap.val();
     if (offer) {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription(offer)
+      );
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-      set(ref(db, `rooms/${roomCode}/answer`), { sdp: answer.sdp, type: answer.type });
+      set(ref(db, `rooms/${roomCode}/answer`), {
+        sdp: answer.sdp,
+        type: answer.type,
+      });
 
       statusText.textContent = "Status: Terhubung!";
       showToast("Terhubung ke pasangan!");
@@ -249,3 +271,18 @@ function showToast(msg) {
     backgroundColor: "#8b5cf6",
   }).showToast();
 }
+console.log("Track diterima dari pasangan:", e.streams);
+console.log("Mengirim offer:", offer);
+console.log("Jawaban diterima:", answerDesc);
+console.log("Menerima offer:", offer);
+console.log("Mengirim jawaban:", answer);
+console.log("Remote stream:", e.streams[0]);
+console.error("Gagal mengakses kamera:", error);
+console.error("Stream belum siap!");
+peerConnection.oniceconnectionstatechange = () => {
+  console.log("ICE connection state:", peerConnection.iceConnectionState);
+};
+
+peerConnection.onconnectionstatechange = () => {
+  console.log("Peer connection state:", peerConnection.connectionState);
+};
