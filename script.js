@@ -362,3 +362,119 @@ function showToast(msg) {
     },
   }).showToast();
 }
+
+// Tambahan untuk slot kosong
+function renderEmptyStripSlots() {
+  photoGallery.innerHTML = "";
+  for (let i = 0; i < totalStrips; i++) {
+    const placeholder = document.createElement("div");
+    placeholder.classList.add(
+      "w-32",
+      "h-32",
+      "border-2",
+      "border-dashed",
+      "border-purple-300",
+      "rounded",
+      "flex",
+      "items-center",
+      "justify-center",
+      "text-purple-300",
+      "text-sm",
+      "mb-3"
+    );
+    placeholder.textContent = `Slot ${i + 1}`;
+    photoGallery.appendChild(placeholder);
+  }
+}
+
+// Di generateRoom & joinRoom panggil ini setelah photoGallery.innerHTML = ""
+renderEmptyStripSlots();
+
+// Countdown sebelum capture
+captureBtn.onclick = async () => {
+  if (capturedImages.length >= totalStrips) {
+    showToast("Strip sudah penuh!");
+    return;
+  }
+  statusText.textContent = "Status: Countdown...";
+  for (let i = 3; i > 0; i--) {
+    showToast(`Siap... ${i}`);
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  captureAndSend();
+};
+
+// Notifikasi ke pasangan di setupPartnerCaptureListener()
+showToast("Pasanganmu sudah capture, giliran kamu sekarang!");
+
+// Gabungkan ke slot kosong di combineImages()
+function combineImages(imgLeftSrc, imgRightSrc) {
+  const width = 480;
+  const height = 480;
+  canvas.width = width * 2;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+
+  const leftImg = new Image();
+  const rightImg = new Image();
+
+  let loadedCount = 0;
+  function tryDraw() {
+    loadedCount++;
+    if (loadedCount === 2) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(leftImg, 0, 0, width, height);
+      ctx.drawImage(rightImg, width, 0, width, height);
+
+      const combinedDataUrl = canvas.toDataURL("image/png");
+      capturedImages.push(combinedDataUrl);
+
+      const imgElement = document.createElement("img");
+      imgElement.src = combinedDataUrl;
+      imgElement.classList.add("w-32", "rounded", "border-2", "border-purple-600");
+
+      const slot = photoGallery.children[capturedImages.length - 1];
+      slot.innerHTML = "";
+      slot.appendChild(imgElement);
+    }
+  }
+
+  leftImg.onload = tryDraw;
+  rightImg.onload = tryDraw;
+
+  leftImg.src = imgLeftSrc;
+  rightImg.src = imgRightSrc;
+}
+
+// Perbolehkan non-master download juga
+function setupPartnerCaptureListener() {
+  if (partnerCaptureListenerSet) return;
+  partnerCaptureListenerSet = true;
+  const partnerKey = isMaster ? "client" : "master";
+
+  onValue(ref(db, `rooms/${roomCode}/capture/${partnerKey}`), (snapshot) => {
+    const partnerCapture = snapshot.val();
+    if (!partnerCapture) return;
+    if (capturedImages.length >= totalStrips) return;
+
+    const userKey = isMaster ? "master" : "client";
+    onValue(ref(db, `rooms/${roomCode}/capture/${userKey}`), (snap) => {
+      const myCaptureDataUrl = snap.val();
+      if (!myCaptureDataUrl) return;
+
+      showToast("Pasanganmu sudah capture, giliran kamu sekarang!");
+
+      combineImages(
+        isMaster ? myCaptureDataUrl : partnerCapture,
+        isMaster ? partnerCapture : myCaptureDataUrl
+      );
+
+      remove(ref(db, `rooms/${roomCode}/capture`));
+
+      if (capturedImages.length + 1 === totalStrips) {
+        setTimeout(updateDownloadLink, 1000);
+      }
+    }, { onlyOnce: true });
+  });
+}
+

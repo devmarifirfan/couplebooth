@@ -10,10 +10,46 @@
       href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
     />
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <style>
+      body {
+        background: linear-gradient(135deg, #ffe4ec, #ffd6f6);
+        overflow-x: hidden;
+      }
+      .flower {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background-image: url('https://i.ibb.co/yBgjmNT/flower.png');
+        background-size: cover;
+        animation: float 10s linear infinite;
+        opacity: 0.7;
+      }
+      @keyframes float {
+        0% {
+          transform: translateY(0) rotate(0);
+        }
+        100% {
+          transform: translateY(-100vh) rotate(360deg);
+        }
+      }
+    </style>
   </head>
-  <body class="bg-gray-100 text-center p-6 font-sans">
-    <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-purple-700">
-      Photobooth buat pacalku yg lagi pgn bgttt tapi kita LDR 💜
+  <body class="text-center p-6 font-sans relative">
+    <!-- Bunga Animasi -->
+    <script>
+      for (let i = 0; i < 10; i++) {
+        const flower = document.createElement('div');
+        flower.className = 'flower';
+        flower.style.left = `${Math.random() * 100}vw`;
+        flower.style.top = `${100 + Math.random() * 50}vh`;
+        flower.style.animationDelay = `${Math.random() * 10}s`;
+        document.body.appendChild(flower);
+      }
+    </script>
+
+    <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-pink-600">
+      💗 Photobooth LDR 💗<br />
+      buat pacalku yg lagi pgn bgtttt photobooth💕
     </h1>
 
     <!-- Room Setup -->
@@ -27,13 +63,13 @@
       <div class="space-x-2">
         <button
           onclick="generateRoom()"
-          class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+          class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded"
         >
           🎲 Buat Room
         </button>
         <button
           onclick="joinRoom()"
-          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
         >
           📥 Join Room
         </button>
@@ -57,24 +93,22 @@
     <div id="booth" class="mt-10 hidden space-y-6">
       <div class="flex flex-wrap justify-center gap-6">
         <div>
-          <p class="font-medium mb-1">Kamera Kamu</p>
+          <p class="font-medium mb-1">Kamera Kamu 💖</p>
           <video
             id="localVideo"
             autoplay
             playsinline
             muted
-            class="w-64 h-64 object-cover rounded shadow border"
+            class="w-64 h-64 object-cover rounded shadow border border-pink-400"
           ></video>
         </div>
         <div>
-          <p class="font-medium mb-1">Pasanganmu</p>
+          <p class="font-medium mb-1">Pasanganmu 💘</p>
           <video
             id="remoteVideo"
             autoplay
             playsinline
-            class="w-64 h-64 object-cover rounded shadow border"
-            onloadedmetadata="console.log('Remote video loaded metadata')"
-            onplaying="console.log('Remote video is playing')"
+            class="w-64 h-64 object-cover rounded shadow border border-pink-400"
           ></video>
         </div>
       </div>
@@ -83,7 +117,7 @@
       <div class="space-y-2">
         <button
           onclick="flipCamera()"
-          class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
+          class="bg-yellow-400 hover:bg-yellow-500 text-white px-4 py-2 rounded"
         >
           🔄 Flip Kamera
         </button>
@@ -95,24 +129,22 @@
       <!-- Capture Button -->
       <button
         id="captureBtn"
-        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow"
+        class="bg-pink-600 hover:bg-pink-700 text-white px-6 py-2 rounded shadow"
       >
-        📸 Capture
+        📸 Capture!
       </button>
 
       <!-- Preview Area -->
       <div id="previewArea" class="mt-6">
-        <h2 class="text-lg font-semibold mb-2">Hasil Strip</h2>
-        <div
-          id="photoGallery"
-          class="flex flex-wrap justify-center gap-3"
-        ></div>
+        <h2 class="text-lg font-semibold mb-2 text-pink-700">Hasil Strip 💞</h2>
+        <div id="emptySlots" class="flex flex-wrap justify-center gap-3"></div>
+        <div id="photoGallery" class="flex flex-wrap justify-center gap-3"></div>
         <a
           id="downloadStripLink"
-          class="mt-4 inline-block bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded hidden"
+          class="mt-4 inline-block bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded hidden"
           download="strip.png"
         >
-          📥 Download Strip
+          💾 Download Strip
         </a>
       </div>
     </div>
