@@ -40,8 +40,8 @@ window.joinRoom = async function () {
       video: {
         width: { ideal: 320 },
         height: { ideal: 240 },
-        aspectRatio: 4 / 3
-      }
+        aspectRatio: 4 / 3,
+      },
     });
     localVideo.srcObject = stream;
 
@@ -101,14 +101,37 @@ function startCountdown(callback) {
 
 captureBtn.onclick = () => {
   startCountdown(() => {
-    const width = 320;
-    const height = 240;
-    canvas.width = width * 2;
-    canvas.height = height;
+    const squareSize = 240; // 1:1 ratio per user
+    canvas.width = squareSize * 2;
+    canvas.height = squareSize;
     const ctx = canvas.getContext("2d");
 
-    ctx.drawImage(localVideo, 0, 0, width, height);
-    ctx.drawImage(remoteImg, width, 0, width, height);
+    // Crop center dari video jadi 1:1
+    const cropX = (localVideo.videoWidth - squareSize) / 2;
+    const cropY = (localVideo.videoHeight - squareSize) / 2;
+
+    ctx.drawImage(
+      localVideo,
+      cropX,
+      cropY,
+      squareSize,
+      squareSize,
+      0,
+      0,
+      squareSize,
+      squareSize
+    );
+    ctx.drawImage(
+      remoteImg,
+      0,
+      0,
+      remoteImg.naturalWidth,
+      remoteImg.naturalHeight,
+      squareSize,
+      0,
+      squareSize,
+      squareSize
+    );
 
     const imageURL = canvas.toDataURL("image/png");
     capturedImages.push(imageURL);
