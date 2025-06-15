@@ -109,7 +109,9 @@ function setupConnection() {
     if (e.candidate) {
       const candidateRef = ref(
         db,
-        `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`
+        `rooms/${roomCode}/${
+          isMaster ? "callerCandidates" : "calleeCandidates"
+        }`
       );
       push(candidateRef, e.candidate.toJSON());
     }
@@ -321,9 +323,17 @@ function updateDownload() {
 
 resetRoomBtn.onclick = () => {
   if (!roomCode) return alert("Belum masuk room.");
+
+  // Hapus semua data di Firebase untuk room tersebut
   remove(ref(db, `rooms/${roomCode}`));
-  showToast("Room berhasil di-reset.");
-  location.reload();
+
+  // Reset galeri foto
+  capturedImages = [];
+  photoGallery.innerHTML = "";
+  downloadStripLink.classList.add("hidden");
+  renderEmptyStrips();
+
+  showToast("Room berhasil di-reset. Siap foto ulang!");
 };
 
 function showToast(msg) {
