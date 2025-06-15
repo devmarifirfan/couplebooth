@@ -50,12 +50,19 @@ window.joinRoom = async () => {
   capturedImages = [];
   photoGallery.innerHTML = "";
   downloadStripLink.classList.add("hidden");
-
   booth.classList.remove("hidden");
 
   await setupCamera();
   setupConnection();
   renderEmptyStrips();
+
+  // Semua user mendengarkan doneStrips
+  onChildAdded(ref(db, `rooms/${roomCode}/doneStrips`), (snap) => {
+    const data = snap.val();
+    if (data && Array.isArray(data)) {
+      combineImages(data[0], data[1], true);
+    }
+  });
 };
 
 async function setupCamera() {
@@ -64,7 +71,6 @@ async function setupCamera() {
       video: { facingMode: currentFacingMode, width: 480, height: 480 },
       audio: false,
     });
-    console.log("Akses kamera berhasil:", stream);
     localVideo.srcObject = stream;
   } catch (error) {
     console.error("Gagal mengakses kamera:", error);
@@ -77,49 +83,28 @@ window.flipCamera = async () => {
   if (stream) stream.getTracks().forEach((track) => track.stop());
   await setupCamera();
   if (peerConnection) {
-    const sender = peerConnection
-      .getSenders()
-      .find((s) => s.track.kind === "video");
+    const sender = peerConnection.getSenders().find((s) => s.track.kind === "video");
     if (sender) sender.replaceTrack(stream.getVideoTracks()[0]);
   }
 };
 
 function setupConnection() {
-  if (!stream) {
-    console.error("Stream belum siap!");
-    return;
-  }
+  if (!stream) return;
 
   peerConnection = new RTCPeerConnection(rtcConfig);
-
-  stream.getTracks().forEach((track) => {
-    peerConnection.addTrack(track, stream);
-  });
+  stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
 
   peerConnection.ontrack = (e) => {
-    console.log("Track diterima dari pasangan:", e.streams);
     if (e.streams && e.streams[0]) {
       remoteVideo.srcObject = e.streams[0];
-      console.log("Remote stream:", e.streams[0]);
     }
   };
 
   peerConnection.onicecandidate = (e) => {
     if (e.candidate) {
-      const candidateRef = ref(
-        db,
-        `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`
-      );
+      const candidateRef = ref(db, `rooms/${roomCode}/${isMaster ? "callerCandidates" : "calleeCandidates"}`);
       push(candidateRef, e.candidate.toJSON());
     }
-  };
-
-  peerConnection.oniceconnectionstatechange = () => {
-    console.log("ICE connection state:", peerConnection.iceConnectionState);
-  };
-
-  peerConnection.onconnectionstatechange = () => {
-    console.log("Peer connection state:", peerConnection.connectionState);
   };
 
   if (isMaster) {
@@ -131,17 +116,13 @@ function setupConnection() {
 
 async function createOffer() {
   const offer = await peerConnection.createOffer();
-  console.log("Mengirim offer:", offer);
   await peerConnection.setLocalDescription(offer);
-  set(ref(db, `rooms/${roomCode}/offer`), { sdp: offer.sdp, type: offer.type });
+  set(ref(db, `rooms/${roomCode}/offer`), offer);
 
   onValue(ref(db, `rooms/${roomCode}/answer`), async (snapshot) => {
     const data = snapshot.val();
     if (data && !peerConnection.currentRemoteDescription) {
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(data)
-      );
-      console.log("Jawaban diterima:", data);
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
       statusText.textContent = "Status: Terhubung!";
       showToast("Pasangan terhubung!");
     }
@@ -158,18 +139,10 @@ function listenForOffer() {
   onValue(ref(db, `rooms/${roomCode}/offer`), async (snap) => {
     const offer = snap.val();
     if (offer) {
-      console.log("Menerima offer:", offer);
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(offer)
-      );
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
-      console.log("Mengirim jawaban:", answer);
-      set(ref(db, `rooms/${roomCode}/answer`), {
-        sdp: answer.sdp,
-        type: answer.type,
-      });
-
+      set(ref(db, `rooms/${roomCode}/answer`), answer);
       statusText.textContent = "Status: Terhubung!";
       showToast("Terhubung ke pasangan!");
 
@@ -187,27 +160,12 @@ function renderEmptyStrips() {
   for (let i = 0; i < totalStrips; i++) {
     const row = document.createElement("div");
     row.classList.add("flex", "gap-2", "mb-2");
-
     const img1 = document.createElement("div");
     const img2 = document.createElement("div");
-
     [img1, img2].forEach((el) => {
-      el.classList.add(
-        "w-40",
-        "h-40",
-        "bg-purple-100",
-        "border",
-        "border-dashed",
-        "flex",
-        "items-center",
-        "justify-center",
-        "text-purple-300",
-        "text-sm",
-        "rounded"
-      );
+      el.classList.add("w-40", "h-40", "bg-purple-100", "border", "border-dashed", "flex", "items-center", "justify-center", "text-purple-300", "text-sm", "rounded");
       el.textContent = "Foto";
     });
-
     row.appendChild(img1);
     row.appendChild(img2);
     photoGallery.appendChild(row);
@@ -215,10 +173,7 @@ function renderEmptyStrips() {
 }
 
 captureBtn.onclick = () => {
-  if (capturedImages.length >= totalStrips) {
-    showToast("Strip sudah penuh!");
-    return;
-  }
+  if (capturedImages.length >= totalStrips) return showToast("Strip sudah penuh!");
 
   const squareSize = 480;
   canvas.width = squareSize;
@@ -245,7 +200,7 @@ captureBtn.onclick = () => {
   });
 };
 
-function combineImages(img1, img2) {
+function combineImages(img1, img2, fromFirebase = false) {
   const left = new Image();
   const right = new Image();
   let loaded = 0;
@@ -261,17 +216,9 @@ function combineImages(img1, img2) {
         [img1, img2].forEach((src, i) => {
           const img = document.createElement("img");
           img.src = src;
-          img.classList.add(
-            "w-full",
-            "h-full",
-            "object-cover",
-            "rounded",
-            "border"
-          );
-
-          // Replace content inside each column div (left & right)
+          img.classList.add("w-full", "h-full", "object-cover", "rounded", "border");
           const cell = row.children[i];
-          cell.innerHTML = ""; // clear placeholder text
+          cell.innerHTML = "";
           cell.appendChild(img);
         });
       }
@@ -279,13 +226,16 @@ function combineImages(img1, img2) {
       if (capturedImages.length === totalStrips) {
         setTimeout(updateDownload, 500);
       }
+
+      if (!fromFirebase && isMaster) {
+        push(ref(db, `rooms/${roomCode}/doneStrips`), [img1, img2]);
+      }
     }
   };
 
   left.src = isMaster ? img1 : img2;
   right.src = isMaster ? img2 : img1;
 }
-
 
 function updateDownload() {
   if (capturedImages.length < 1) return;
@@ -297,18 +247,34 @@ function updateDownload() {
 
   let loadedCount = 0;
 
-  capturedImages.forEach((src, index) => {
+  capturedImages.forEach(([leftSrc, rightSrc], index) => {
     const img = new Image();
-    img.src = src;
-    img.onload = () => {
-      ctx.drawImage(img, 0, index * 480, 960, 480);
-      loadedCount++;
-      if (loadedCount === capturedImages.length) {
-        const dataURL = stripCanvas.toDataURL("image/png");
-        downloadStripLink.href = dataURL;
-        downloadStripLink.classList.remove("hidden");
+    const rowCanvas = document.createElement("canvas");
+    rowCanvas.width = 960;
+    rowCanvas.height = 480;
+    const rowCtx = rowCanvas.getContext("2d");
+
+    const leftImg = new Image();
+    const rightImg = new Image();
+
+    let rowLoaded = 0;
+    leftImg.onload = rightImg.onload = () => {
+      rowLoaded++;
+      if (rowLoaded === 2) {
+        rowCtx.drawImage(leftImg, 0, 0, 480, 480);
+        rowCtx.drawImage(rightImg, 480, 0, 480, 480);
+        ctx.drawImage(rowCanvas, 0, index * 480);
+        loadedCount++;
+        if (loadedCount === capturedImages.length) {
+          const dataURL = stripCanvas.toDataURL("image/png");
+          downloadStripLink.href = dataURL;
+          downloadStripLink.classList.remove("hidden");
+        }
       }
     };
+
+    leftImg.src = leftSrc;
+    rightImg.src = rightSrc;
   });
 }
 
